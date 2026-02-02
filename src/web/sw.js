@@ -17,7 +17,7 @@ self.addEventListener('fetch', e => {
   const path = url.pathname;
   const isListPage = path.startsWith('/v/') && path.length > 3;
   const isDashboard = path === '/portal/dashboard';
-  const isPage = (isListPage || isDashboard) && e.request.mode === 'navigator';
+  const isPage = (isListPage || isDashboard) && e.request.mode === 'navigate';
 
   if (!isPage) return;
 
