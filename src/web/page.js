@@ -738,7 +738,9 @@ export function listPageHtml() {
         return;
       }
       if (btn.classList.contains('edit-btn')) {
-        const item = (localItems || []).find(i => i.name === name);
+        const row = btn.closest('.item');
+        const itemName = row && row.dataset.name;
+        const item = itemName && (localItems || []).find(i => i.name === itemName);
         if (item) {
           document.getElementById('editItemName').value = item.name;
           document.getElementById('editName').value = item.name;
