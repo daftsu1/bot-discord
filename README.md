@@ -73,22 +73,97 @@ sudo usermod -aG docker ec2-user
 # Cerrar sesión y volver a entrar, luego:
 sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
+
+# Git (para clonar y para CI/CD)
+sudo yum install -y git
 ```
 
-- Clona el repo (o sube los archivos), crea `.env` y levanta el bot:
+**Ubuntu:**
 
 ```bash
-cd bot-discord-despensa
-# Crear .env con DISCORD_BOT_TOKEN y DISCORD_CLIENT_ID
-docker compose up -d --build
+sudo apt update && sudo apt install -y docker.io git
+sudo systemctl start docker && sudo systemctl enable docker
+sudo usermod -aG docker ubuntu
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
 ```
 
-- Ver logs: `docker compose logs -f`
+Cierra sesión SSH y vuelve a entrar (o ejecuta `newgrp docker`) para que el usuario pueda usar Docker sin `sudo`.
 
-- Reiniciar: `docker compose restart`  
-- Parar: `docker compose down`
+### 3. Configurar SSH en EC2 (para clonar por Git y para CI/CD)
+
+Así la instancia puede clonar el repo por SSH y, más adelante, un pipeline (p. ej. GitHub Actions) puede hacer `git pull` o desplegar vía SSH.
+
+**En la instancia EC2:**
+
+1. Generar una clave SSH (sin passphrase para uso en servidor):
+
+```bash
+ssh-keygen -t ed25519 -C "ec2-bot-alacena" -f ~/.ssh/id_ed25519_bot -N ""
+```
+
+2. Ver la clave pública para copiarla:
+
+```bash
+cat ~/.ssh/id_ed25519_bot.pub
+```
+
+Copia todo el contenido (empieza con `ssh-ed25519 ...`).
+
+3. En **GitHub** (o GitLab/Bitbucket):
+   - Repo → **Settings** → **Deploy keys** → **Add deploy key**
+   - **Title:** `EC2 bot alacena` (o el nombre que quieras)
+   - **Key:** pega la clave pública
+   - Marca **Allow write access** solo si el CI/CD va a hacer push desde la instancia (normalmente no)
+   - **Add key**
+
+4. Opcional: configurar Git para usar esta clave solo con GitHub:
+
+```bash
+# En EC2
+mkdir -p ~/.ssh
+cat >> ~/.ssh/config << 'EOF'
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_bot
+  IdentitiesOnly yes
+EOF
+chmod 600 ~/.ssh/config
+```
+
+5. Probar que SSH funciona:
+
+```bash
+ssh -T git@github.com
+```
+
+Deberías ver algo como: `Hi usuario/repo! You've successfully authenticated...`
+
+### 4. Clonar, crear `.env` y levantar el bot
+
+```bash
+# Clonar por SSH (reemplaza con tu usuario y repo)
+git clone git@github.com:TU_USUARIO/bot-discord-despensa.git
+cd bot-discord-despensa
+
+# Crear .env con DISCORD_BOT_TOKEN y DISCORD_CLIENT_ID
+nano .env
+
+# Levantar el bot (usa docker-compose si en tu sistema el comando es con guión)
+docker compose up -d --build
+# O: docker-compose up -d --build
+```
+
+- Ver logs: `docker compose logs -f` (o `docker-compose logs -f`)
+- Reiniciar: `docker compose restart` (o `docker-compose restart`)
+- Parar: `docker compose down` (o `docker-compose down`)
+
+Si obtienes `unknown shorthand flag: 'd'`, tu instalación usa el binario clásico: ejecuta **`docker-compose`** (con guión) en lugar de `docker compose`.
 
 El volumen `./data` persiste la base SQLite en el host, así que los datos se mantienen al actualizar la imagen.
+
+**CI/CD más adelante:** Con SSH configurado, puedes añadir un pipeline (p. ej. GitHub Actions) que se conecte por SSH a esta instancia y ejecute `git pull && docker compose up -d --build` (o `docker-compose up -d --build` si usas el binario con guión), o usar la misma clave como deploy key para que la instancia haga pull automático.
 
 ### Build solo con Docker (sin compose)
 
