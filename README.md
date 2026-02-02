@@ -236,6 +236,18 @@ Si obtienes `unknown shorthand flag: 'd'`, tu instalación usa el binario clási
 
 El volumen `./data` persiste la base SQLite en el host, así que los datos se mantienen al actualizar la imagen.
 
+**Resetear la BD en producción** (borra todas las listas y productos):
+
+```bash
+# En el servidor (EC2), dentro del directorio del proyecto:
+docker compose down
+# Borrar la BD (y archivos WAL si existen)
+rm -f data/bot.db data/bot.db-shm data/bot.db-wal
+docker compose up -d --build
+```
+
+Al arrancar, el bot creará de nuevo el esquema vacío.
+
 ### CI/CD con GitHub Actions
 
 Al hacer **push a `main` o `master`**, un workflow despliega automáticamente en EC2: se conecta por SSH, hace `git pull` y ejecuta `docker compose up -d --build`.

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { listService } from '../services/listService.js';
 import { listTokenRepository } from '../database/repositories/listTokenRepository.js';
 import { listRepository } from '../database/repositories/listRepository.js';
@@ -46,8 +46,17 @@ export const command = {
       const baseUrl = config.web.baseUrl.replace(/\/$/, '');
       const link = `${baseUrl}/v/${token}`;
 
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setLabel('Abrir lista')
+            .setStyle(ButtonStyle.Link)
+            .setURL(link)
+        );
+
       await interaction.editReply({
-        content: `📱 **Link para la lista "${display}":**\n${link}\n\nAbre este enlace en tu navegador para ver y marcar. El link es privado; no lo compartas si no quieres que otros editen esta lista.`,
+        content: `📱 **Link para la lista "${display}":**\n\nPulsa el botón para abrir la lista en tu navegador y marcar los productos. El link es privado; no lo compartas si no quieres que otros editen esta lista.`,
+        components: [row],
         ephemeral: true
       });
     } catch (err) {
