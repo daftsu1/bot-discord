@@ -46,19 +46,28 @@ export const command = {
       const baseUrl = config.web.baseUrl.replace(/\/$/, '');
       const link = `${baseUrl}/v/${token}`;
 
-      const row = new ActionRowBuilder()
-        .addComponents(
-          new ButtonBuilder()
-            .setLabel('Abrir lista')
-            .setStyle(ButtonStyle.Link)
-            .setURL(link)
-        );
+      // Discord solo acepta URLs públicas en botones Link (no localhost)
+      const isPublicUrl = /^https?:\/\/(?!localhost|127\.0\.0\.1)[^\s]+/i.test(link);
 
-      await interaction.editReply({
-        content: `📱 **Link para la lista "${display}":**\n\nPulsa el botón para abrir la lista en tu navegador y marcar los productos. El link es privado; no lo compartas si no quieres que otros editen esta lista.`,
-        components: [row],
+      const payload = {
+        content: isPublicUrl
+          ? `📱 **Link para la lista "${display}":**\n\nPulsa el botón para abrir la lista en tu navegador y marcar los productos. El link es privado; no lo compartas si no quieres que otros editen esta lista.`
+          : `📱 **Link para la lista "${display}":**\n${link}\n\nAbre este enlace en tu navegador para ver y marcar. El link es privado; no lo compartas si no quieres que otros editen esta lista.`,
         ephemeral: true
-      });
+      };
+
+      if (isPublicUrl) {
+        payload.components = [
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setLabel('Abrir lista')
+              .setStyle(ButtonStyle.Link)
+              .setURL(link)
+          )
+        ];
+      }
+
+      await interaction.editReply(payload);
     } catch (err) {
       await interaction.editReply({
         content: `❌ ${err.message}`,
