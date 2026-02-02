@@ -202,6 +202,19 @@ export function listPageHtml() {
       margin-top: 1.25rem;
     }
     .modal-actions .btn { flex: 1; }
+    .category-group {
+      margin-bottom: 1rem;
+    }
+    .category-group:last-child { margin-bottom: 0; }
+    .category-group .group-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.5rem;
+      padding-left: 0.25rem;
+    }
     .empty {
       color: var(--text-muted);
       padding: 1.25rem;
@@ -474,6 +487,31 @@ export function listPageHtml() {
       updateOfflineBanner();
     }
 
+    function groupByCategory(items) {
+      const groups = {};
+      for (const i of items) {
+        const cat = (i.category || '').trim() || 'Sin categoría';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(i);
+      }
+      const order = Object.keys(groups).sort((a, b) => {
+        if (a === 'Sin categoría') return 1;
+        if (b === 'Sin categoría') return -1;
+        return a.localeCompare(b, 'es');
+      });
+      return order.map(cat => ({ label: cat, items: groups[cat] }));
+    }
+
+    function renderGroupedHtml(items, isDone) {
+      const groups = groupByCategory(items);
+      return groups.map(g => 
+        '<div class="category-group">' +
+        '<div class="group-label">' + escapeHtml(g.label) + '</div>' +
+        g.items.map(i => itemRow(i, isDone, false)).join('') +
+        '</div>'
+      ).join('');
+    }
+
     function render(items) {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('content').style.display = 'block';
@@ -483,10 +521,10 @@ export function listPageHtml() {
       document.getElementById('pendingSection').style.display = pending.length ? 'block' : 'none';
       document.getElementById('doneSection').style.display = done.length ? 'block' : 'none';
       document.getElementById('pendingList').innerHTML = pending.length
-        ? pending.map(i => itemRow(i, false)).join('')
+        ? renderGroupedHtml(pending, false)
         : '<p class="empty">Nada pendiente</p>';
       const doneHtml = done.length
-        ? done.map(i => itemRow(i, true)).join('') +
+        ? renderGroupedHtml(done, true) +
           (totalPrice > 0 ? '<p class="total-price">Total: ' + formatPrice(totalPrice) + '</p>' : '')
         : '<p class="empty">Ninguno comprado aún</p>';
       document.getElementById('doneList').innerHTML = doneHtml;
@@ -498,11 +536,12 @@ export function listPageHtml() {
       return '$' + n.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     }
 
-    function itemRow(item, isDone) {
+    function itemRow(item, isDone, showCategory) {
+      if (showCategory === undefined) showCategory = true;
       const qtyPart = item.unit
         ? ' <span class="qty">· ' + item.quantity + ' ' + escapeHtml(item.unit) + '</span>'
         : (item.quantity > 1 ? ' <span class="qty">x' + item.quantity + '</span>' : '');
-      const cat = item.category ? ' <span class="cat">' + escapeHtml(item.category) + '</span>' : '';
+      const cat = showCategory && item.category ? ' <span class="cat">' + escapeHtml(item.category) + '</span>' : '';
       const pricePart = isDone && item.price != null ? ' <span class="price">' + formatPrice(item.price) + '</span>' : '';
       const removeBtn = '<button class="btn remove" type="button" title="Quitar de la lista">Quitar</button>';
       if (isDone) {
