@@ -4,7 +4,7 @@ Bot de Discord para gestionar la lista de compras del supermercado, con soporte 
 
 ## Módulo 1: Lista de compras
 
-- **/help** – Muestra los comandos disponibles del bot
+- **/ayuda** – Muestra los comandos disponibles del bot
 - **/agregar** – Añade productos (con cantidad y categoría opcionales)
 - **/quitar** – Elimina un producto de la lista
 - **/lista** – Muestra la lista (incluye o excluye comprados)

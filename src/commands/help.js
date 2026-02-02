@@ -2,7 +2,7 @@ import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 
 export const command = {
   data: new SlashCommandBuilder()
-    .setName('help')
+    .setName('ayuda')
     .setDescription('Muestra los comandos disponibles del bot'),
 
   async execute(interaction) {
@@ -16,7 +16,7 @@ export const command = {
       .setTimestamp();
 
     const fields = [...commands.values()]
-      .filter(c => c.data.name !== 'help')
+      .filter(c => c.data.name !== 'ayuda')
       .map(c => ({
         name: `/${c.data.name}`,
         value: c.data.description || '—',

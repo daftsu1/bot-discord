@@ -1,13 +1,33 @@
-# Despliega el bot en EC2 al hacer push a main/master
-name: Deploy to EC2
+# Ejecuta tests y despliega el bot en EC2 al hacer push a main/master
+name: Test and Deploy
 
 on:
   push:
     branches: [main, master]
 
 jobs:
-  deploy:
+  test:
+    name: Tests
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Ejecutar tests
+        run: npm test
+
+  deploy:
+    name: Deploy a EC2
+    runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Desplegar en EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -16,6 +36,6 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd ~/proyectos/bot-discord
+            cd ~/proyectos/bot-discord-despensa
             git pull origin $(git rev-parse --abbrev-ref HEAD)
             docker compose up -d --build
