@@ -79,10 +79,10 @@ export function listPageHtml() {
     }
     .item {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      justify-content: space-between;
       gap: 0.75rem;
-      padding: 1rem 1rem;
+      padding: 1rem;
       background: var(--surface);
       border-radius: var(--radius);
       margin-bottom: 0.5rem;
@@ -97,6 +97,7 @@ export function listPageHtml() {
     .item.done .label { text-decoration: line-through; color: var(--text-muted); }
     .label {
       flex: 1;
+      min-width: 0;
       font-size: 1rem;
       font-weight: 500;
       line-height: 1.4;
@@ -165,7 +166,18 @@ export function listPageHtml() {
       margin: 1rem 0;
     }
     .btn.add:hover { opacity: 0.95; }
-    .item-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+    .item-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    @media (max-width: 420px) {
+      .item { flex-direction: column; align-items: stretch; }
+      .item .label { flex: none; }
+      .item-actions { width: 100%; justify-content: flex-end; }
+      .btn { padding: 0.5rem 0.75rem; font-size: 0.8125rem; white-space: nowrap; }
+    }
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -674,7 +686,7 @@ export function listPageHtml() {
       }
       return '<div class="item" data-name="' + escapeHtml(item.name) + '">' +
         '<span class="label">' + escapeHtml(item.name) + qtyPart + cat + '</span>' +
-        '<div class="item-actions">' + editBtn + removeBtn + '<button class="btn done mark-btn" type="button">✓ Marcar comprado</button></div></div>';
+        '<div class="item-actions">' + editBtn + removeBtn + '<button class="btn done mark-btn" type="button" title="Marcar como comprado">✓ Marcar</button></div></div>';
     }
 
     function escapeHtml(s) {
