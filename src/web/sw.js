@@ -1,4 +1,4 @@
-const CACHE = 'despensa-v2';
+const CACHE = 'despensa-v3';
 const LIST_PAGE_KEY = '/v/_template';
 
 self.addEventListener('install', e => {
@@ -12,29 +12,40 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+function getCacheKey(url, isListPage) {
+  const path = url.pathname.replace(/\/$/, '') || '/';
+  if (isListPage) return url.origin + LIST_PAGE_KEY;
+  if (path === '/portal/dashboard') return url.origin + '/portal/dashboard';
+  return null;
+}
+
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  const path = url.pathname;
+  const path = url.pathname.replace(/\/$/, '') || '/';
   const isListPage = path.startsWith('/v/') && path.length > 3;
   const isDashboard = path === '/portal/dashboard';
-  const isPage = (isListPage || isDashboard) && e.request.mode === 'navigate';
+  const isPage = (isListPage || isDashboard) && (e.request.mode === 'navigate' || e.request.destination === 'document');
 
   if (!isPage) return;
 
+  const cacheKey = getCacheKey(url, isListPage);
+  if (!cacheKey) return;
+
   e.respondWith(
     fetch(e.request)
-      .then(res => {
+      .then(async res => {
         const clone = res.clone();
-        caches.open(CACHE).then(cache => {
-          cache.put(isListPage ? url.origin + LIST_PAGE_KEY : e.request, clone);
-        });
+        const cache = await caches.open(CACHE);
+        await cache.put(cacheKey, clone);
         return res;
       })
-      .catch(() => {
-        const cacheKey = isListPage ? url.origin + LIST_PAGE_KEY : e.request;
-        return caches.match(cacheKey).then(cached =>
-          cached || new Response('Sin conexión. Abre la app con internet primero.', { status: 503 })
-        );
-      })
+      .catch(() =>
+        caches.match(cacheKey).then(cached =>
+          cached || new Response('Sin conexión. Abre la app con internet primero.', {
+            status: 503,
+            headers: { 'Content-Type': 'text/html; charset=utf-8' }
+          })
+        )
+      )
   );
 });

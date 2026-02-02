@@ -37,6 +37,7 @@ export function createWebServer() {
 
   app.get('/sw.js', (req, res) => {
     res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Cache-Control', 'no-cache, max-age=0');
     res.send(readFileSync(path.join(__dirname, 'sw.js'), 'utf8'));
   });
 

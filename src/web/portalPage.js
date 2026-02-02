@@ -83,6 +83,9 @@ export function loginPageHtml(baseUrl) {
       Iniciar sesión con Discord
     </a>
   </div>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
+  </script>
 </body>
 </html>`;
 }
