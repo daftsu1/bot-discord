@@ -61,6 +61,20 @@ El link es estable; puedes guardarlo en favoritos. Configura `WEB_BASE_URL` en `
 
 **Editar** un ítem (cambiar cantidad, unidad, etc.) por ahora solo desde Discord: usa `/quitar` y vuelve a `/agregar` con los datos correctos. Un comando `/editar` o edición desde la web se puede añadir más adelante.
 
+### Portal web (login con Discord)
+
+En `{WEB_BASE_URL}/portal` hay un **portal** donde puedes iniciar sesión con Discord y ver **todas tus listas** en un solo lugar:
+- Listas que creaste tú
+- Listas grupales a las que te uniste con `/unirse`
+- Listas que tengas activas en algún canal
+
+Para activarlo:
+1. En [Discord Developer Portal](https://discord.com/developers/applications) → tu aplicación → OAuth2 → Redirects, añade:  
+   `http://localhost:3000/portal/auth/callback` (desarrollo) y/o  
+   `https://tu-dominio/portal/auth/callback` (producción).
+2. En `.env` añade `DISCORD_CLIENT_SECRET` (misma app, pestaña OAuth2).
+3. Opcional: `SESSION_SECRET` para firmar cookies (si no, se usa el bot token).
+
 ## Requisitos
 
 - Node.js 18+ o [Bun](https://bun.sh) (para desarrollo local)

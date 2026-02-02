@@ -267,7 +267,7 @@ export function listPageHtml() {
   </div>
   <header class="header">
     <h1>🛒 Lista de compras</h1>
-    <p class="sub">Bot Despensa</p>
+    <p class="sub">Bot Despensa · <a href="/portal" style="color:var(--accent);text-decoration:none;">Ver todas mis listas</a></p>
   </header>
   <div id="loading">Cargando…</div>
   <div id="content" style="display:none;">
@@ -406,13 +406,13 @@ export function listPageHtml() {
         document.getElementById('error').style.display = 'none';
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
-        if (!navigator.onLine && getCachedItems()) {
-          localItems = getCachedItems();
+        if (!navigator.onLine) {
+          localItems = getCachedItems() || [];
           render(localItems);
           document.getElementById('content').style.display = 'block';
           document.getElementById('error').style.display = 'none';
         } else {
-          document.getElementById('error').textContent = navigator.onLine ? e.message : 'Sin conexión. Los cambios se guardarán al reconectar.';
+          document.getElementById('error').textContent = e.message;
           document.getElementById('error').style.display = 'block';
         }
       }

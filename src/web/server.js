@@ -4,8 +4,11 @@ import { channelTokenRepository } from '../database/repositories/channelTokenRep
 import { listTokenRepository } from '../database/repositories/listTokenRepository.js';
 import { listRepository } from '../database/repositories/listRepository.js';
 import { shoppingRepository } from '../database/repositories/shoppingRepository.js';
+import { userListsRepository } from '../database/repositories/userListsRepository.js';
 import { validateProductName, validateQuantity, validateCategory, validateUnit } from '../validation/index.js';
 import { listPageHtml } from './page.js';
+import { loginPageHtml, dashboardPageHtml } from './portalPage.js';
+import { parseSession, setSessionCookie, clearSessionCookie } from './auth.js';
 
 const WEB_USER_ID = 'web';
 
@@ -134,6 +137,83 @@ export function createWebServer() {
       console.error('[Web] POST remove:', err);
       res.status(500).json({ error: err.message });
     }
+  });
+
+  /** ---- Portal con login Discord ---- */
+  const baseUrl = config.web.baseUrl.replace(/\/$/, '');
+  const clientId = process.env.DISCORD_CLIENT_ID;
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+
+  app.get('/portal', (req, res) => {
+    const session = parseSession(req);
+    if (session) {
+      return res.redirect('/portal/dashboard');
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(loginPageHtml(baseUrl));
+  });
+
+  app.get('/portal/auth/callback', async (req, res) => {
+    const { code } = req.query;
+    if (!code || !clientId || !clientSecret) {
+      return res.redirect('/portal?error=config');
+    }
+    try {
+      const redirectUri = `${baseUrl}/portal/auth/callback`;
+      const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirectUri
+        })
+      });
+      const tokenData = await tokenRes.json();
+      if (tokenData.error) {
+        console.error('[Web] OAuth token error:', tokenData);
+        return res.redirect('/portal?error=token');
+      }
+      const userRes = await fetch('https://discord.com/api/users/@me', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` }
+      });
+      const userData = await userRes.json();
+      if (userData.id) {
+        const avatarUrl = userData.avatar
+          ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png?size=64`
+          : null;
+        setSessionCookie(res, {
+          userId: userData.id,
+          username: userData.global_name || userData.username || 'Usuario',
+          avatarUrl
+        });
+      }
+      res.redirect('/portal/dashboard');
+    } catch (err) {
+      console.error('[Web] OAuth callback error:', err);
+      res.redirect('/portal?error=callback');
+    }
+  });
+
+  app.get('/portal/dashboard', (req, res) => {
+    const session = parseSession(req);
+    if (!session) {
+      return res.redirect('/portal');
+    }
+    const lists = userListsRepository.getListsForUser(session.userId);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(dashboardPageHtml(
+      { username: session.username, avatarUrl: session.avatarUrl },
+      lists,
+      baseUrl
+    ));
+  });
+
+  app.get('/portal/logout', (req, res) => {
+    clearSessionCookie(res);
+    res.redirect('/portal');
   });
 
   const port = config.web.port;
