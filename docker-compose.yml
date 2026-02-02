@@ -1,0 +1,10 @@
+services:
+  bot:
+    build: .
+    image: bot-discord-alacena:latest
+    container_name: bot-alacena
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    # Para EC2: el bot solo hace conexiones salientes a Discord; no necesita puertos publicados

@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start:bun": "bun run src/index.js",
+    "dev": "node --watch src/index.js",
+    "dev:bun": "bun --watch src/index.js"
   },
   "keywords": ["discord", "bot", "shopping", "lista-compras"],
   "license": "MIT",
