@@ -6,6 +6,7 @@ import { db } from './connection.js';
  * o usar cada uno su lista personal en el mismo canal.
  */
 export function initSchema() {
+  // Crear solo tablas de listas y tokens; shopping_items se crea o migra después
   db.exec(`
     CREATE TABLE IF NOT EXISTS lists (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,24 +53,38 @@ export function initSchema() {
       UNIQUE(guild_id, channel_id)
     );
     CREATE INDEX IF NOT EXISTS idx_channel_tokens_lookup ON channel_tokens(guild_id, channel_id);
-
-    CREATE TABLE IF NOT EXISTS shopping_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      quantity INTEGER DEFAULT 1,
-      category TEXT,
-      unit TEXT,
-      is_purchased INTEGER DEFAULT 0,
-      purchased_at TEXT,
-      purchased_by TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now')),
-      UNIQUE(list_id, name)
-    );
-    CREATE INDEX IF NOT EXISTS idx_shopping_list ON shopping_items(list_id);
-    CREATE INDEX IF NOT EXISTS idx_shopping_purchased ON shopping_items(is_purchased);
   `);
+
+  ensureShoppingItemsTable();
+}
+
+/** Crea shopping_items si no existe, o migra desde esquema antiguo (guild_id/channel_id) y aplica índices. */
+function ensureShoppingItemsTable() {
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='shopping_items'"
+  ).get();
+
+  if (!tableExists) {
+    db.exec(`
+      CREATE TABLE shopping_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        category TEXT,
+        unit TEXT,
+        is_purchased INTEGER DEFAULT 0,
+        purchased_at TEXT,
+        purchased_by TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(list_id, name)
+      );
+      CREATE INDEX IF NOT EXISTS idx_shopping_list ON shopping_items(list_id);
+      CREATE INDEX IF NOT EXISTS idx_shopping_purchased ON shopping_items(is_purchased);
+    `);
+    return;
+  }
 
   const tableInfo = db.prepare('PRAGMA table_info(shopping_items)').all();
   const hasListId = tableInfo.some(c => c.name === 'list_id');
@@ -77,15 +92,20 @@ export function initSchema() {
 
   if (!hasListId && hasGuildId) {
     db.exec('ALTER TABLE shopping_items ADD COLUMN list_id INTEGER REFERENCES lists(id)');
-  }
-
-  runListsMigration();
-
-  if (hasGuildId && hasListId) {
+    runListsMigration();
+    runRecreateItemsTable();
+  } else if (hasListId && hasGuildId) {
+    runListsMigration();
     runRecreateItemsTable();
   }
 
-  if (!tableInfo.some(c => c.name === 'unit')) {
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_shopping_list ON shopping_items(list_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_shopping_purchased ON shopping_items(is_purchased)');
+  } catch (_) {}
+
+  const currentInfo = db.prepare('PRAGMA table_info(shopping_items)').all();
+  if (!currentInfo.some(c => c.name === 'unit')) {
     db.exec('ALTER TABLE shopping_items ADD COLUMN unit TEXT');
   }
 }
