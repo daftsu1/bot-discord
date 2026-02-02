@@ -32,6 +32,7 @@ function resolveTokenToListId(token) {
 
 export function createWebServer() {
   const app = express();
+  app.set('trust proxy', 1);
   app.use(express.json());
 
   app.get('/sw.js', (req, res) => {

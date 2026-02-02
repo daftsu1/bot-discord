@@ -45,9 +45,11 @@ export function parseSession(req) {
 export function setSessionCookie(res, payload) {
   const value = signSession(payload);
   const maxAge = MAX_AGE_SEC;
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`);
+  const secure = (process.env.WEB_BASE_URL || '').startsWith('https') ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`);
 }
 
 export function clearSessionCookie(res) {
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  const secure = (process.env.WEB_BASE_URL || '').startsWith('https') ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
 }
