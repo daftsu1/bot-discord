@@ -6,21 +6,50 @@ import { db } from '../connection.js';
 export const shoppingRepository = {
   addItem(listId, name, quantity = 1, category = null, unit = null) {
     const normalizedName = name.trim().toLowerCase();
-    db.prepare(`
-      INSERT INTO shopping_items (list_id, name, quantity, category, unit, updated_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(list_id, name) DO UPDATE SET
-        quantity = quantity + excluded.quantity,
-        category = COALESCE(excluded.category, category),
-        unit = COALESCE(excluded.unit, unit),
-        updated_at = datetime('now')
-    `).run(listId, normalizedName, quantity, category, unit);
+    try {
+      db.prepare(`
+        INSERT INTO shopping_items (list_id, name, quantity, category, unit, updated_at)
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(list_id, name) DO UPDATE SET
+          quantity = quantity + excluded.quantity,
+          category = COALESCE(excluded.category, category),
+          unit = COALESCE(excluded.unit, unit),
+          updated_at = datetime('now')
+      `).run(listId, normalizedName, quantity, category, unit);
+    } catch (e) {
+      if (e.code === 'SQLITE_ERROR' && e.message && e.message.includes('ON CONFLICT')) {
+        this._addItemUpsert(listId, normalizedName, quantity, category, unit);
+      } else {
+        throw e;
+      }
+    }
 
     return db.prepare(`
       SELECT id, name, quantity, category, unit, is_purchased
       FROM shopping_items 
       WHERE list_id = ? AND LOWER(name) = ?
     `).get(listId, normalizedName);
+  },
+
+  _addItemUpsert(listId, normalizedName, quantity, category, unit) {
+    const row = db.prepare(
+      'SELECT id, quantity FROM shopping_items WHERE list_id = ? AND LOWER(name) = ?'
+    ).get(listId, normalizedName);
+    if (row) {
+      db.prepare(`
+        UPDATE shopping_items SET
+          quantity = quantity + ?,
+          category = COALESCE(?, category),
+          unit = COALESCE(?, unit),
+          updated_at = datetime('now')
+        WHERE list_id = ? AND LOWER(name) = ?
+      `).run(quantity, category, unit, listId, normalizedName);
+    } else {
+      db.prepare(`
+        INSERT INTO shopping_items (list_id, name, quantity, category, unit, updated_at)
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+      `).run(listId, normalizedName, quantity, category, unit);
+    }
   },
 
   removeItem(listId, name) {

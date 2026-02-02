@@ -53,6 +53,17 @@ describe('shoppingService', () => {
       expect(shoppingRepository.addItem).toHaveBeenCalledWith(mockList.id, 'leche', 2, 'lácteos', 'L');
       expect(result).toEqual({ success: true, item: mockItem });
     });
+
+    it('guarda cantidad y unidad (gramaje) correctamente', () => {
+      const mockItem = { id: 1, name: 'arroz', quantity: 3, category: null, unit: 'kg', is_purchased: 0 };
+      vi.mocked(shoppingRepository.addItem).mockReturnValue(mockItem);
+
+      const result = shoppingService.addItem(GUILD, CHANNEL, USER, 'arroz', 3, null, 'kg');
+
+      expect(shoppingRepository.addItem).toHaveBeenCalledWith(mockList.id, 'arroz', 3, null, 'kg');
+      expect(result.item.quantity).toBe(3);
+      expect(result.item.unit).toBe('kg');
+    });
   });
 
   describe('removeItem', () => {

@@ -14,7 +14,7 @@ export const command = {
     )
     .addIntegerOption(opt =>
       opt.setName('cantidad')
-        .setDescription('Cantidad (default: 1)')
+        .setDescription('Cantidad (ej: 2 para 2 kg). Por defecto: 1')
         .setMinValue(1)
         .setMaxValue(LIMITS.QUANTITY_MAX)
     )
@@ -56,7 +56,8 @@ export const command = {
       );
 
       const categoryStr = item.category ? ` [${item.category}]` : '';
-      const unitStr = item.unit ? ` · ${item.quantity} ${item.unit}` : ` x${item.quantity}`;
+      const qty = item.quantity ?? 1;
+      const unitStr = item.unit ? ` · ${qty} ${item.unit}` : (qty > 1 ? ` x${qty}` : '');
       await interaction.editReply({
         content: `✅ **${item.name}**${unitStr}${categoryStr} agregado a la lista.`
       });

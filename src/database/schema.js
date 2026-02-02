@@ -82,6 +82,7 @@ function ensureShoppingItemsTable() {
       );
       CREATE INDEX IF NOT EXISTS idx_shopping_list ON shopping_items(list_id);
       CREATE INDEX IF NOT EXISTS idx_shopping_purchased ON shopping_items(is_purchased);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_list_name ON shopping_items(list_id, name);
     `);
     return;
   }
@@ -102,6 +103,8 @@ function ensureShoppingItemsTable() {
   try {
     db.exec('CREATE INDEX IF NOT EXISTS idx_shopping_list ON shopping_items(list_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_shopping_purchased ON shopping_items(is_purchased)');
+    // Índice único para que INSERT ... ON CONFLICT(list_id, name) funcione (p. ej. tras migración antigua)
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_list_name ON shopping_items(list_id, name)');
   } catch (_) {}
 
   const currentInfo = db.prepare('PRAGMA table_info(shopping_items)').all();
