@@ -12,7 +12,7 @@ import { userListPreferenceRepository } from '../database/repositories/userListP
 import { shoppingRepository } from '../database/repositories/shoppingRepository.js';
 import { userListsRepository } from '../database/repositories/userListsRepository.js';
 import { getListDisplayName } from '../services/listService.js';
-import { validateProductName, validateQuantity, validateCategory, validateUnit } from '../validation/index.js';
+import { validateProductName, validateQuantity, validateCategory, validateUnit, validatePrice } from '../validation/index.js';
 import { listPageHtml } from './page.js';
 import { loginPageHtml, dashboardPageHtml } from './portalPage.js';
 import { parseSession, setSessionCookie, clearSessionCookie } from './auth.js';
@@ -101,11 +101,12 @@ export function createWebServer() {
   app.post('/api/v/:token/items/mark', resolveList, (req, res) => {
     try {
       const { listId } = req.listContext;
-      const { itemName } = req.body || {};
+      const { itemName, price } = req.body || {};
       if (!itemName || typeof itemName !== 'string') {
         return res.status(400).json({ error: 'itemName requerido' });
       }
-      const result = shoppingRepository.markAsPurchased(listId, itemName.trim(), WEB_USER_ID);
+      const validPrice = validatePrice(price);
+      const result = shoppingRepository.markAsPurchased(listId, itemName.trim(), WEB_USER_ID, validPrice);
       if (!result) {
         return res.status(404).json({ error: 'No se encontró el producto en la lista' });
       }

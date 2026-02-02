@@ -103,6 +103,7 @@ export function listPageHtml() {
     }
     .label .qty { color: var(--text-muted); font-size: 0.9em; font-weight: 400; }
     .label .cat { color: var(--accent); font-size: 0.85em; font-weight: 400; }
+    .label .price { color: var(--success); font-size: 0.9em; font-weight: 500; margin-left: 0.25rem; }
     .btn {
       padding: 0.5rem 1rem;
       border: none;
@@ -210,6 +211,15 @@ export function listPageHtml() {
       border-radius: var(--radius);
       border: 1px dashed rgba(148, 163, 184, 0.3);
     }
+    .total-price {
+      margin: 0.75rem 0 0;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border-radius: var(--radius);
+      font-weight: 600;
+      color: var(--success);
+      text-align: right;
+    }
     .error {
       color: var(--danger);
       padding: 1rem;
@@ -282,6 +292,23 @@ export function listPageHtml() {
     </div>
   </div>
   <p id="error" class="error" style="display:none;"></p>
+
+  <div class="modal-overlay" id="markModal">
+    <div class="modal">
+      <h3>Marcar como comprado</h3>
+      <p class="mark-item-name" id="markItemName"></p>
+      <form id="markForm">
+        <div class="form-group">
+          <label for="markPrice">Precio (opcional)</label>
+          <input type="number" id="markPrice" name="price" placeholder="ej: 1500" min="0" step="0.01" autocomplete="off">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn remove" id="btnCancelMark">Cancelar</button>
+          <button type="submit" class="btn done">Marcar</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <div class="modal-overlay" id="addModal">
     <div class="modal">
@@ -379,7 +406,7 @@ export function listPageHtml() {
       const list = (items || localItems || []).map(i => ({ ...i }));
       if (type === 'mark') {
         const it = list.find(i => i.name.toLowerCase() === (payload.itemName || '').toLowerCase());
-        if (it) { it.is_purchased = 1; it.purchased_at = new Date().toISOString(); }
+        if (it) { it.is_purchased = 1; it.purchased_at = new Date().toISOString(); it.price = payload.price ?? null; }
       } else if (type === 'unmark') {
         const it = list.find(i => i.name.toLowerCase() === (payload.itemName || '').toLowerCase());
         if (it) { it.is_purchased = 0; it.purchased_at = null; it.purchased_by = null; }
@@ -452,14 +479,23 @@ export function listPageHtml() {
       document.getElementById('content').style.display = 'block';
       const pending = items.filter(i => !i.is_purchased);
       const done = items.filter(i => i.is_purchased);
+      const totalPrice = done.reduce((sum, i) => sum + (i.price != null ? Number(i.price) * (i.quantity || 1) : 0), 0);
       document.getElementById('pendingSection').style.display = pending.length ? 'block' : 'none';
       document.getElementById('doneSection').style.display = done.length ? 'block' : 'none';
       document.getElementById('pendingList').innerHTML = pending.length
         ? pending.map(i => itemRow(i, false)).join('')
         : '<p class="empty">Nada pendiente</p>';
-      document.getElementById('doneList').innerHTML = done.length
-        ? done.map(i => itemRow(i, true)).join('')
+      const doneHtml = done.length
+        ? done.map(i => itemRow(i, true)).join('') +
+          (totalPrice > 0 ? '<p class="total-price">Total: ' + formatPrice(totalPrice) + '</p>' : '')
         : '<p class="empty">Ninguno comprado aún</p>';
+      document.getElementById('doneList').innerHTML = doneHtml;
+    }
+
+    function formatPrice(p) {
+      if (p == null || p === '' || isNaN(Number(p))) return '';
+      const n = Number(p);
+      return '$' + n.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     }
 
     function itemRow(item, isDone) {
@@ -467,15 +503,16 @@ export function listPageHtml() {
         ? ' <span class="qty">· ' + item.quantity + ' ' + escapeHtml(item.unit) + '</span>'
         : (item.quantity > 1 ? ' <span class="qty">x' + item.quantity + '</span>' : '');
       const cat = item.category ? ' <span class="cat">' + escapeHtml(item.category) + '</span>' : '';
+      const pricePart = isDone && item.price != null ? ' <span class="price">' + formatPrice(item.price) + '</span>' : '';
       const removeBtn = '<button class="btn remove" type="button" title="Quitar de la lista">Quitar</button>';
       if (isDone) {
         return '<div class="item done" data-name="' + escapeHtml(item.name) + '">' +
-          '<span class="label">' + escapeHtml(item.name) + qtyPart + cat + '</span>' +
+          '<span class="label">' + escapeHtml(item.name) + qtyPart + cat + pricePart + '</span>' +
           '<div class="item-actions">' + removeBtn + '<button class="btn undo" type="button">Desmarcar</button></div></div>';
       }
       return '<div class="item" data-name="' + escapeHtml(item.name) + '">' +
         '<span class="label">' + escapeHtml(item.name) + qtyPart + cat + '</span>' +
-        '<div class="item-actions">' + removeBtn + '<button class="btn done" type="button">✓ Marcar comprado</button></div></div>';
+        '<div class="item-actions">' + removeBtn + '<button class="btn done mark-btn" type="button">✓ Marcar comprado</button></div></div>';
     }
 
     function escapeHtml(s) {
@@ -511,6 +548,8 @@ export function listPageHtml() {
       }
     }
 
+    let pendingMarkName = null;
+
     document.body.addEventListener('click', async (e) => {
       const btn = e.target.closest('button');
       if (!btn) return;
@@ -523,9 +562,22 @@ export function listPageHtml() {
         document.getElementById('addModal').classList.remove('open');
         return;
       }
+      if (btn.id === 'btnCancelMark') {
+        document.getElementById('markModal').classList.remove('open');
+        pendingMarkName = null;
+        return;
+      }
       const item = btn.closest('.item');
       const name = item && item.dataset.name;
       if (!name) return;
+      if (btn.classList.contains('mark-btn')) {
+        pendingMarkName = name;
+        document.getElementById('markItemName').textContent = name;
+        document.getElementById('markPrice').value = '';
+        document.getElementById('markModal').classList.add('open');
+        document.getElementById('markPrice').focus();
+        return;
+      }
       let path = '/items/mark', type = 'mark';
       if (btn.classList.contains('undo')) { path = '/items/unmark'; type = 'unmark'; }
       if (btn.classList.contains('remove')) { path = '/items/remove'; type = 'remove'; }
@@ -533,11 +585,34 @@ export function listPageHtml() {
       await doAction(path, body, type, { itemName: name });
     });
 
+    document.getElementById('markForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = pendingMarkName;
+      if (!name) return;
+      const priceVal = document.getElementById('markPrice').value.trim();
+      const price = priceVal ? parseFloat(priceVal.replace(',', '.')) : null;
+      document.getElementById('markModal').classList.remove('open');
+      pendingMarkName = null;
+      const body = { itemName: name };
+      if (price != null && !isNaN(price) && price >= 0) body.price = price;
+      await doAction('/items/mark', body, 'mark', { itemName: name, price: body.price ?? null });
+    });
+
     document.getElementById('addModal').addEventListener('click', (e) => {
       if (e.target.id === 'addModal') document.getElementById('addModal').classList.remove('open');
     });
+    document.getElementById('markModal').addEventListener('click', (e) => {
+      if (e.target.id === 'markModal') {
+        document.getElementById('markModal').classList.remove('open');
+        pendingMarkName = null;
+      }
+    });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') document.getElementById('addModal').classList.remove('open');
+      if (e.key === 'Escape') {
+        document.getElementById('addModal').classList.remove('open');
+        document.getElementById('markModal').classList.remove('open');
+        pendingMarkName = null;
+      }
     });
 
     document.getElementById('addForm').addEventListener('submit', async (e) => {

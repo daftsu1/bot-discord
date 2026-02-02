@@ -70,4 +70,19 @@ export function validateUnit(unit) {
   return trimmed;
 }
 
+/**
+ * Valida el precio de compra (opcional). Número >= 0.
+ * @param {number|string|null|undefined} price
+ * @returns {number|null}
+ */
+export function validatePrice(price) {
+  if (price == null || price === '') return null;
+  const trimmed = String(price).trim();
+  if (!trimmed) return null;
+  const num = Number(trimmed.replace(',', '.'));
+  if (Number.isNaN(num) || num < 0) return null;
+  if (num > LIMITS.PRICE_MAX) return null;
+  return Math.round(num * 100) / 100; // 2 decimales
+}
+
 export { LIMITS };

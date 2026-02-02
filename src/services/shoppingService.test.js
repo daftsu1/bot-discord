@@ -123,7 +123,17 @@ describe('shoppingService', () => {
 
       const result = shoppingService.markAsPurchased(GUILD, CHANNEL, USER, 'leche', USER);
 
-      expect(shoppingRepository.markAsPurchased).toHaveBeenCalledWith(mockList.id, 'leche', USER);
+      expect(shoppingRepository.markAsPurchased).toHaveBeenCalledWith(mockList.id, 'leche', USER, null);
+      expect(result).toEqual({ success: true, item: mockItem });
+    });
+
+    it('pasa el precio al repositorio cuando se proporciona', () => {
+      const mockItem = { id: 1, name: 'leche', quantity: 1, price: 1500 };
+      vi.mocked(shoppingRepository.markAsPurchased).mockReturnValue(mockItem);
+
+      const result = shoppingService.markAsPurchased(GUILD, CHANNEL, USER, 'leche', USER, 1500);
+
+      expect(shoppingRepository.markAsPurchased).toHaveBeenCalledWith(mockList.id, 'leche', USER, 1500);
       expect(result).toEqual({ success: true, item: mockItem });
     });
   });

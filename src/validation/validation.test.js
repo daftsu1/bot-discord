@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateProductName, validateQuantity, validateCategory, validateUnit, LIMITS } from './index.js';
+import { validateProductName, validateQuantity, validateCategory, validateUnit, validatePrice, LIMITS } from './index.js';
 
 describe('validateProductName', () => {
   it('rechaza null o undefined', () => {
@@ -93,5 +93,33 @@ describe('validateUnit', () => {
     expect(validateUnit('  L  ')).toBe('L');
     expect(validateUnit('kg')).toBe('kg');
     expect(validateUnit('ml')).toBe('ml');
+  });
+});
+
+describe('validatePrice', () => {
+  it('devuelve null para null, undefined o string vacío', () => {
+    expect(validatePrice(null)).toBeNull();
+    expect(validatePrice(undefined)).toBeNull();
+    expect(validatePrice('')).toBeNull();
+    expect(validatePrice('   ')).toBeNull();
+  });
+
+  it('devuelve null para valores inválidos', () => {
+    expect(validatePrice(-1)).toBeNull();
+    expect(validatePrice(-0.01)).toBeNull();
+    expect(validatePrice('abc')).toBeNull();
+    expect(validatePrice(NaN)).toBeNull();
+  });
+
+  it('acepta precio válido y redondea a 2 decimales', () => {
+    expect(validatePrice(1500)).toBe(1500);
+    expect(validatePrice(99.99)).toBe(99.99);
+    expect(validatePrice(99.996)).toBe(100);
+    expect(validatePrice('1500')).toBe(1500);
+    expect(validatePrice('99,50')).toBe(99.5);
+  });
+
+  it('acepta 0', () => {
+    expect(validatePrice(0)).toBe(0);
   });
 });

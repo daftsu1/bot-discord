@@ -25,7 +25,7 @@ export const shoppingRepository = {
     }
 
     return db.prepare(`
-      SELECT id, name, quantity, category, unit, is_purchased
+      SELECT id, name, quantity, category, unit, is_purchased, price
       FROM shopping_items 
       WHERE list_id = ? AND LOWER(name) = ?
     `).get(listId, normalizedName);
@@ -63,7 +63,7 @@ export const shoppingRepository = {
 
   getItems(listId, { includePurchased = true } = {}) {
     let query = `
-      SELECT id, name, quantity, category, unit, is_purchased, purchased_at, purchased_by
+      SELECT id, name, quantity, category, unit, is_purchased, purchased_at, purchased_by, price
       FROM shopping_items 
       WHERE list_id = ?
     `;
@@ -76,22 +76,22 @@ export const shoppingRepository = {
     return stmt.all(listId);
   },
 
-  markAsPurchased(listId, itemName, userId) {
+  markAsPurchased(listId, itemName, userId, price = null) {
     const stmt = db.prepare(`
       UPDATE shopping_items 
-      SET is_purchased = 1, purchased_at = datetime('now'), purchased_by = ?, updated_at = datetime('now')
+      SET is_purchased = 1, purchased_at = datetime('now'), purchased_by = ?, price = COALESCE(?, price), updated_at = datetime('now')
       WHERE list_id = ? AND LOWER(name) = LOWER(?)
-      RETURNING id, name, quantity, category, unit
+      RETURNING id, name, quantity, category, unit, price
     `);
-    return stmt.get(userId, listId, itemName.trim());
+    return stmt.get(userId, price ?? null, listId, itemName.trim());
   },
 
   unmarkAsPurchased(listId, itemName) {
     const stmt = db.prepare(`
       UPDATE shopping_items 
-      SET is_purchased = 0, purchased_at = NULL, purchased_by = NULL, updated_at = datetime('now')
+      SET is_purchased = 0, purchased_at = NULL, purchased_by = NULL, price = NULL, updated_at = datetime('now')
       WHERE list_id = ? AND LOWER(name) = LOWER(?)
-      RETURNING id, name, quantity, category, unit
+      RETURNING id, name, quantity, category, unit, price
     `);
     return stmt.get(listId, itemName.trim());
   },

@@ -1,6 +1,6 @@
 import { shoppingRepository } from '../database/repositories/shoppingRepository.js';
 import { listService } from './listService.js';
-import { validateProductName, validateQuantity, validateCategory, validateUnit } from '../validation/index.js';
+import { validateProductName, validateQuantity, validateCategory, validateUnit, validatePrice } from '../validation/index.js';
 
 const NO_LIST_MSG = 'No tienes una lista activa en este canal. Usa `/mi-lista` (tu lista), `/usar-lista` o `/crear-lista`.';
 
@@ -39,12 +39,13 @@ export const shoppingService = {
     return shoppingRepository.getItems(list.id, { includePurchased });
   },
 
-  markAsPurchased(guildId, channelId, userId, itemName, markedByUserId) {
+  markAsPurchased(guildId, channelId, userId, itemName, markedByUserId, price = null) {
     const list = listService.getCurrentList(guildId, channelId, userId);
     if (!list) throw new Error(NO_LIST_MSG);
 
     const validName = validateProductName(itemName);
-    const result = shoppingRepository.markAsPurchased(list.id, validName, markedByUserId);
+    const validPrice = validatePrice(price);
+    const result = shoppingRepository.markAsPurchased(list.id, validName, markedByUserId, validPrice);
     if (!result) throw new Error(`No se encontró "${validName}" en la lista`);
     return { success: true, item: result };
   },

@@ -11,5 +11,7 @@ export const LIMITS = {
   /** Cantidad máxima por ítem (evita números desproporcionados) */
   QUANTITY_MAX: 9999,
   /** Longitud máxima de la unidad (L, ml, kg, g, un, etc.) */
-  UNIT_MAX_LENGTH: 10
+  UNIT_MAX_LENGTH: 10,
+  /** Precio máximo por ítem (evita valores absurdos) */
+  PRICE_MAX: 999999999
 };

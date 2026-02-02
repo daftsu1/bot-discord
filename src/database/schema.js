@@ -111,6 +111,9 @@ function ensureShoppingItemsTable() {
   if (!currentInfo.some(c => c.name === 'unit')) {
     db.exec('ALTER TABLE shopping_items ADD COLUMN unit TEXT');
   }
+  if (!currentInfo.some(c => c.name === 'price')) {
+    db.exec('ALTER TABLE shopping_items ADD COLUMN price REAL');
+  }
 }
 
 function runRecreateItemsTable() {

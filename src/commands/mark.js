@@ -15,6 +15,12 @@ export const command = {
             .setRequired(true)
             .setMaxLength(LIMITS.PRODUCT_NAME_MAX_LENGTH)
         )
+        .addNumberOption(opt =>
+          opt.setName('precio')
+            .setDescription('Precio de compra (opcional)')
+            .setRequired(false)
+            .setMinValue(0)
+        )
     )
     .addSubcommand(sub =>
       sub.setName('pendiente')
@@ -32,6 +38,7 @@ export const command = {
 
     const subcommand = interaction.options.getSubcommand();
     const product = interaction.options.getString('producto');
+    const price = interaction.options.getNumber('precio');
 
     try {
       if (subcommand === 'comprado') {
@@ -40,10 +47,12 @@ export const command = {
           interaction.channelId,
           interaction.user.id,
           product,
-          interaction.user.id
+          interaction.user.id,
+          price
         );
+        const priceStr = price != null ? ` ($${Number(price).toLocaleString('es-CL')})` : '';
         await interaction.editReply({
-          content: `✅ **${product}** marcado como comprado.`
+          content: `✅ **${product}** marcado como comprado.${priceStr}`
         });
       } else {
         shoppingService.unmarkAsPurchased(
