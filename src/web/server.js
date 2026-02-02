@@ -1,4 +1,9 @@
 import express from 'express';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { config } from '../config/index.js';
 import { channelTokenRepository } from '../database/repositories/channelTokenRepository.js';
 import { listTokenRepository } from '../database/repositories/listTokenRepository.js';
@@ -6,6 +11,7 @@ import { listRepository } from '../database/repositories/listRepository.js';
 import { userListPreferenceRepository } from '../database/repositories/userListPreferenceRepository.js';
 import { shoppingRepository } from '../database/repositories/shoppingRepository.js';
 import { userListsRepository } from '../database/repositories/userListsRepository.js';
+import { getListDisplayName } from '../services/listService.js';
 import { validateProductName, validateQuantity, validateCategory, validateUnit } from '../validation/index.js';
 import { listPageHtml } from './page.js';
 import { loginPageHtml, dashboardPageHtml } from './portalPage.js';
@@ -27,6 +33,11 @@ function resolveTokenToListId(token) {
 export function createWebServer() {
   const app = express();
   app.use(express.json());
+
+  app.get('/sw.js', (req, res) => {
+    res.setHeader('Content-Type', 'application/javascript');
+    res.send(readFileSync(path.join(__dirname, 'sw.js'), 'utf8'));
+  });
 
   /** Resuelve token a list_id y lo pone en req.listContext. */
   function resolveList(req, res, next) {
@@ -213,14 +224,23 @@ export function createWebServer() {
 
   app.get('/portal/dashboard', requirePortalSession, async (req, res) => {
     const { portalSession } = req;
-    const lists = userListsRepository.getListsForUser(portalSession.userId);
-    const enriched = await enrichListsWithChannelInfo(lists);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(dashboardPageHtml(
-      { username: portalSession.username, avatarUrl: portalSession.avatarUrl },
-      enriched,
-      baseUrl
-    ));
+    res.send(dashboardPageHtml(baseUrl));
+  });
+
+  app.get('/api/portal/lists', requirePortalSession, async (req, res) => {
+    try {
+      const { portalSession } = req;
+      const lists = userListsRepository.getListsForUser(portalSession.userId);
+      const enriched = await enrichListsWithChannelInfo(lists);
+      res.json({
+        user: { username: portalSession.username, avatarUrl: portalSession.avatarUrl },
+        lists: enriched
+      });
+    } catch (err) {
+      console.error('[Web] GET portal lists:', err);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.get('/api/portal/guilds', requirePortalSession, async (req, res) => {
@@ -247,20 +267,27 @@ export function createWebServer() {
     try {
       const { guildId, channelId, name, isPersonal } = req.body || {};
       const userId = req.portalSession.userId;
-      if (!guildId || !channelId || !name || typeof name !== 'string') {
-        return res.status(400).json({ error: 'guildId, channelId y name son requeridos' });
+      if (!guildId || !channelId) {
+        return res.status(400).json({ error: 'guildId y channelId son requeridos' });
       }
-      const listName = name.trim().toLowerCase();
-      if (!listName) return res.status(400).json({ error: 'Nombre inválido' });
-      const list = listRepository.getByChannelAndName(guildId, channelId, listName);
-      if (list) return res.status(400).json({ error: `Ya existe una lista "${listName}" en ese canal` });
-      const finalName = isPersonal ? `personal-${userId}` : listName;
+      let finalName;
+      if (isPersonal) {
+        const customName = (name || '').trim();
+        const slug = customName ? customName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\u00f1\u00e1\u00e9\u00ed\u00f3\u00fa\-]/gi, '') : '';
+        finalName = slug ? `personal-${userId}-${slug}` : `personal-${userId}`;
+      } else {
+        const listName = (name || '').trim().toLowerCase();
+        if (!listName) return res.status(400).json({ error: 'Nombre requerido para listas compartidas' });
+        finalName = listName;
+      }
+      const existing = listRepository.getByChannelAndName(guildId, channelId, finalName);
+      if (existing) return res.status(400).json({ error: `Ya existe una lista con ese nombre en ese canal` });
       const created = listRepository.create(guildId, channelId, finalName, userId);
       if (!created) return res.status(400).json({ error: 'No se pudo crear la lista' });
       listRepository.addMember(created.id, userId);
       userListPreferenceRepository.set(guildId, channelId, userId, created.id);
       const token = listTokenRepository.createOrGetToken(created.id);
-      res.json({ ok: true, list: { ...created, token, displayName: isPersonal ? 'Mi lista' : finalName } });
+      res.json({ ok: true, list: { ...created, token, displayName: getListDisplayName(created, userId) } });
     } catch (err) {
       console.error('[Web] create list:', err);
       res.status(500).json({ error: err.message });

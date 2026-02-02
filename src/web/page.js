@@ -326,6 +326,16 @@ export function listPageHtml() {
 
     const api = (path, opts = {}) => fetch('/api/v/' + token + path, opts);
 
+    function isConnectionSlow() {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!conn) return false;
+      if (conn.saveData) return true;
+      if (conn.effectiveType && (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g')) return true;
+      if (conn.downlink != null && conn.downlink < 1) return true;
+      if (conn.rtt != null && conn.rtt > 500) return true;
+      return false;
+    }
+
     function getQueue() {
       try {
         return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
@@ -396,6 +406,17 @@ export function listPageHtml() {
     }
 
     async function load() {
+      const cached = getCachedItems();
+      const preferCache = isConnectionSlow() && cached && cached.length >= 0;
+
+      if (preferCache) {
+        localItems = cached;
+        render(cached);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+        document.getElementById('error').style.display = 'none';
+      }
+
       try {
         const r = await api('/items');
         if (!r.ok) throw new Error('No se pudo cargar la lista');
@@ -405,15 +426,22 @@ export function listPageHtml() {
         render(items);
         document.getElementById('error').style.display = 'none';
       } catch (e) {
-        document.getElementById('loading').style.display = 'none';
-        if (!navigator.onLine) {
-          localItems = getCachedItems() || [];
-          render(localItems);
-          document.getElementById('content').style.display = 'block';
-          document.getElementById('error').style.display = 'none';
-        } else {
-          document.getElementById('error').textContent = e.message;
-          document.getElementById('error').style.display = 'block';
+        if (!preferCache) {
+          document.getElementById('loading').style.display = 'none';
+          if (!navigator.onLine && cached) {
+            localItems = cached || [];
+            render(localItems);
+            document.getElementById('content').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+          } else if (!navigator.onLine) {
+            localItems = [];
+            render([]);
+            document.getElementById('content').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+          } else {
+            document.getElementById('error').textContent = e.message;
+            document.getElementById('error').style.display = 'block';
+          }
         }
       }
       updateOfflineBanner();
@@ -576,6 +604,12 @@ export function listPageHtml() {
     window.addEventListener('online', syncQueue);
     window.addEventListener('offline', updateOfflineBanner);
 
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) conn.addEventListener('change', () => { if (!isConnectionSlow()) load(); });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
     load();
   </script>
 </body>

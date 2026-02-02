@@ -109,28 +109,31 @@ function groupListsByChannel(lists) {
   return groups;
 }
 
-export function dashboardPageHtml(user, lists, baseUrl) {
+function renderListsHtml(lists, baseUrl) {
   const groups = groupListsByChannel(lists);
-  const listSections = groups.size === 0
-    ? '<p class="empty">No tienes listas aún. Crea una desde el botón de abajo o usa el bot en Discord.</p>'
-    : [...groups.entries()].map(([key, g]) => {
-        const items = g.items.map(l => {
-          const link = `${baseUrl.replace(/\/$/, '')}/v/${l.token}`;
-          const badge = l.isOwner ? '<span class="badge owner">Tuya</span>' : '<span class="badge shared">Compartida</span>';
-          return `<a href="${link}" class="list-card">
-            <div class="list-info">
-              <span class="list-name">${escapeHtml(l.displayName)}</span>
-              ${badge}
-            </div>
-            <span class="list-arrow">→</span>
-          </a>`;
-        }).join('');
-        return `<div class="channel-group">
-          <h3 class="channel-label">${g.label}</h3>
-          <div class="channel-lists">${items}</div>
-        </div>`;
-      }).join('');
+  if (groups.size === 0) {
+    return '<p class="empty">No tienes listas aún. Crea una desde el botón de abajo o usa el bot en Discord.</p>';
+  }
+  return [...groups.entries()].map(([key, g]) => {
+    const items = g.items.map(l => {
+      const link = `${baseUrl.replace(/\/$/, '')}/v/${l.token}`;
+      const badge = l.isOwner ? '<span class="badge owner">Tuya</span>' : '<span class="badge shared">Compartida</span>';
+      return `<a href="${link}" class="list-card">
+        <div class="list-info">
+          <span class="list-name">${escapeHtml(l.displayName)}</span>
+          ${badge}
+        </div>
+        <span class="list-arrow">→</span>
+      </a>`;
+    }).join('');
+    return `<div class="channel-group">
+      <h3 class="channel-label">${g.label}</h3>
+      <div class="channel-lists">${items}</div>
+    </div>`;
+  }).join('');
+}
 
+export function dashboardPageHtml(baseUrl) {
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -307,20 +310,28 @@ export function dashboardPageHtml(user, lists, baseUrl) {
       border-radius: var(--radius);
       border: 1px dashed rgba(148, 163, 184, 0.3);
     }
+    .offline-banner {
+      background: #fbbf24;
+      color: #1f2937;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+  <div class="offline-banner" id="portalOfflineBanner" style="display:none;">Sin conexión — Usando datos guardados</div>
   <header class="header">
     <div class="user-info">
-      <img src="${user.avatarUrl || ''}" alt="" class="user-avatar" onerror="this.style.display='none'">
-      <span class="user-name">${escapeHtml(user.username || 'Usuario')}</span>
+      <img id="userAvatar" src="" alt="" class="user-avatar" onerror="this.style.display='none'">
+      <span class="user-name" id="userName">Cargando…</span>
     </div>
     <a href="/portal/logout" class="btn-logout">Cerrar sesión</a>
   </header>
   <h1>Mis listas</h1>
   <p class="sub">Agrupadas por canal. Pulsa para abrir.</p>
   <button type="button" class="btn-add" id="btnNewList">+ Nueva lista</button>
-  <div class="lists">${listSections}</div>
+  <div class="lists" id="listsContainer">Cargando…</div>
 
   <div class="modal-overlay" id="createModal">
     <div class="modal">
@@ -339,8 +350,8 @@ export function dashboardPageHtml(user, lists, baseUrl) {
           </select>
         </div>
         <div class="form-group">
-          <label for="createName">Nombre (para listas compartidas)</label>
-          <input type="text" id="createName" placeholder="ej: semanal, piso" maxlength="50" autocomplete="off">
+          <label for="createName">Nombre de la lista</label>
+          <input type="text" id="createName" placeholder="ej: Compras casa, Semanal, Piso" maxlength="50" autocomplete="off">
         </div>
         <div class="form-check">
           <input type="checkbox" id="createPersonal" checked>
@@ -355,6 +366,94 @@ export function dashboardPageHtml(user, lists, baseUrl) {
   </div>
 
   <script>
+    const baseUrl = ${JSON.stringify(baseUrl)};
+    const CACHE_KEY = 'portal_dashboard_cache';
+
+    function isConnectionSlow() {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!conn) return false;
+      if (conn.saveData) return true;
+      if (conn.effectiveType && (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g')) return true;
+      if (conn.downlink != null && conn.downlink < 1) return true;
+      if (conn.rtt != null && conn.rtt > 500) return true;
+      return false;
+    }
+
+    async function loadDashboard() {
+      const isOffline = !navigator.onLine;
+      const cached = localStorage.getItem(CACHE_KEY);
+      const preferCache = isConnectionSlow() && cached;
+
+      if (preferCache) {
+        try {
+          const data = JSON.parse(cached);
+          renderDashboard(data, false);
+        } catch (_) {}
+      }
+
+      try {
+        const r = await fetch('/api/portal/lists', { credentials: 'include' });
+        if (r.status === 401) { window.location.href = '/portal'; return; }
+        if (!r.ok) throw new Error('Error al cargar');
+        const data = await r.json();
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        renderDashboard(data, false);
+        document.getElementById('portalOfflineBanner').style.display = 'none';
+      } catch (e) {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const data = JSON.parse(cached);
+          renderDashboard(data, true);
+          document.getElementById('portalOfflineBanner').style.display = 'block';
+        } else {
+          document.getElementById('listsContainer').innerHTML = '<p class="empty">' +
+            (isOffline ? 'Sin conexión. Conéctate e inicia sesión para cargar tus listas.' : 'Error al cargar. Recarga la página.') + '</p>';
+          document.getElementById('userName').textContent = '—';
+        }
+      }
+    }
+
+    function renderDashboard(data, isOffline) {
+      const { user, lists } = data;
+      document.getElementById('userName').textContent = user?.username || 'Usuario';
+      const img = document.getElementById('userAvatar');
+      if (user?.avatarUrl) { img.src = user.avatarUrl; img.style.display = ''; } else { img.style.display = 'none'; }
+      document.getElementById('listsContainer').innerHTML = renderLists(lists);
+      document.getElementById('btnNewList').style.display = isOffline ? 'none' : '';
+    }
+
+    function renderLists(lists) {
+      const groups = new Map();
+      for (const l of lists || []) {
+        const key = l.guildId + ':' + l.channelId;
+        const label = (l.guildName || '') + ' › #' + (l.channelName || 'canal');
+        if (!groups.has(key)) groups.set(key, { label, items: [] });
+        groups.get(key).items.push(l);
+      }
+      if (groups.size === 0) return '<p class="empty">No tienes listas aún.</p>';
+      return [...groups.values()].map(g => {
+        const items = g.items.map(l => {
+          const link = baseUrl + '/v/' + l.token;
+          const badge = l.isOwner ? '<span class="badge owner">Tuya</span>' : '<span class="badge shared">Compartida</span>';
+          return '<a href="' + link + '" class="list-card"><div class="list-info"><span class="list-name">' + escapeHtml(l.displayName) + '</span>' + badge + '</div><span class="list-arrow">→</span></a>';
+        }).join('');
+        return '<div class="channel-group"><h3 class="channel-label">' + escapeHtml(g.label) + '</h3><div class="channel-lists">' + items + '</div></div>';
+      }).join('');
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return '';
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+    loadDashboard();
+    window.addEventListener('online', loadDashboard);
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) conn.addEventListener('change', () => { if (!isConnectionSlow()) loadDashboard(); });
+
     const createModal = document.getElementById('createModal');
     const createForm = document.getElementById('createForm');
     const createGuild = document.getElementById('createGuild');
@@ -369,10 +468,6 @@ export function dashboardPageHtml(user, lists, baseUrl) {
     document.getElementById('btnCancelCreate').onclick = () => createModal.classList.remove('open');
     createModal.addEventListener('click', e => { if (e.target === createModal) createModal.classList.remove('open'); });
 
-    createPersonal.addEventListener('change', () => {
-      createName.disabled = createPersonal.checked;
-      if (createPersonal.checked) createName.value = '';
-    });
 
     async function loadGuilds() {
       createGuild.innerHTML = '<option value="">Cargando...</option>';
@@ -399,7 +494,11 @@ export function dashboardPageHtml(user, lists, baseUrl) {
     createForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const isPersonal = createPersonal.checked;
-      const name = isPersonal ? 'mi-lista' : (createName.value.trim() || 'nueva');
+      const name = createName.value.trim();
+      if (!isPersonal && !name) {
+        alert('El nombre es obligatorio para listas compartidas');
+        return;
+      }
       const payload = {
         guildId: createGuild.value,
         channelId: createChannel.value,

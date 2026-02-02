@@ -1,7 +1,6 @@
 import { db } from '../connection.js';
 import { listTokenRepository } from './listTokenRepository.js';
-
-const PERSONAL_PREFIX = 'personal-';
+import { getListDisplayName } from '../../services/listService.js';
 
 /**
  * Listas a las que un usuario tiene acceso (propias, compartidas, o en las que participa).
@@ -27,9 +26,7 @@ export const userListsRepository = {
 
     return rows.map(row => {
       const token = listTokenRepository.createOrGetToken(row.id);
-      const displayName = row.name.startsWith(PERSONAL_PREFIX) && row.name === `${PERSONAL_PREFIX}${userId}`
-        ? 'Mi lista'
-        : row.name;
+      const displayName = getListDisplayName(row, userId);
       return {
         id: row.id,
         guildId: row.guild_id,

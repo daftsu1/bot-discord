@@ -3,10 +3,15 @@ import { userListPreferenceRepository } from '../database/repositories/userListP
 
 const PERSONAL_PREFIX = 'personal-';
 
-/** Nombre a mostrar: "Mi lista" para la lista personal del usuario, sino el nombre de la lista. */
+/** Nombre a mostrar: "Mi lista" para personal sin nombre, o el nombre custom para personal-{userId}-slug. */
 export function getListDisplayName(list, userId) {
   if (!list) return '';
-  if (list.name.startsWith(PERSONAL_PREFIX) && list.name === `${PERSONAL_PREFIX}${userId}`) return 'Mi lista';
+  const prefix = `${PERSONAL_PREFIX}${userId}`;
+  if (list.name === prefix) return 'Mi lista';
+  if (list.name.startsWith(prefix + '-')) {
+    const slug = list.name.slice(prefix.length + 1);
+    return slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Mi lista';
+  }
   return list.name;
 }
 
@@ -36,6 +41,12 @@ export const listService = {
       list = this.ensurePersonalList(guildId, channelId, userId);
     } else {
       list = listRepository.getByChannelAndName(guildId, channelId, listName);
+      if (!list && input) {
+        const slug = input.replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+        if (slug) {
+          list = listRepository.getByChannelAndName(guildId, channelId, `personal-${userId}-${slug}`);
+        }
+      }
     }
     if (!list) throw new Error(`No existe la lista "${listName}" en este canal.`);
     if (!listRepository.canUse(list.id, userId)) {
