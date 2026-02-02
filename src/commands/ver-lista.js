@@ -43,20 +43,29 @@ export const command = {
 
       const display = listService.getListDisplayName(list, userId);
       const token = listTokenRepository.createOrGet(list.id);
-      const baseUrl = config.web.baseUrl.replace(/\/$/, '');
+      const baseUrl = (config.web.baseUrl || '').replace(/\/$/, '').trim();
       const link = `${baseUrl}/v/${token}`;
 
-      // Discord solo acepta URLs públicas en botones Link (no localhost)
+      // Discord solo acepta URLs públicas en botones Link (no localhost) y valida el formato estrictamente
       const isPublicUrl = /^https?:\/\/(?!localhost|127\.0\.0\.1)[^\s]+/i.test(link);
+      let urlValidForButton = false;
+      if (isPublicUrl) {
+        try {
+          new URL(link);
+          urlValidForButton = true;
+        } catch (_) {
+          urlValidForButton = false;
+        }
+      }
 
       const payload = {
-        content: isPublicUrl
+        content: urlValidForButton
           ? `📱 **Link para la lista "${display}":**\n\nPulsa el botón para abrir la lista en tu navegador y marcar los productos. El link es privado; no lo compartas si no quieres que otros editen esta lista.`
           : `📱 **Link para la lista "${display}":**\n${link}\n\nAbre este enlace en tu navegador para ver y marcar. El link es privado; no lo compartas si no quieres que otros editen esta lista.`,
         ephemeral: true
       };
 
-      if (isPublicUrl) {
+      if (urlValidForButton) {
         payload.components = [
           new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -67,7 +76,18 @@ export const command = {
         ];
       }
 
-      await interaction.editReply(payload);
+      try {
+        await interaction.editReply(payload);
+      } catch (replyErr) {
+        if (/invalid url|url/i.test(replyErr?.message || '')) {
+          await interaction.editReply({
+            content: `📱 **Link para la lista "${display}":**\n${link}\n\nAbre este enlace en tu navegador para ver y marcar. El link es privado; no lo compartas si no quieres que otros editen esta lista.`,
+            ephemeral: true
+          });
+        } else {
+          throw replyErr;
+        }
+      }
     } catch (err) {
       await interaction.editReply({
         content: `❌ ${err.message}`,

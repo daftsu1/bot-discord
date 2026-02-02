@@ -18,7 +18,6 @@ export const config = {
 
   /** Vista web (lista en el celular) */
   web: {
-    port: parseInt(process.env.WEB_PORT || '3000', 10),
-    baseUrl: process.env.WEB_BASE_URL || 'http://localhost:3000'
+    port: parseInt(process.env.WEB_PORT || '3000', 10)    baseUrl: (process.env.WEB_BASE_URL || 'http://localhost:3000').trim().replace(/^["']|["']$/g, '')
   }
 };
