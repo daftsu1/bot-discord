@@ -1,18 +1,18 @@
-# Build stage: instalar dependencias (better-sqlite3 compila nativo)
-FROM oven/bun:1-alpine AS builder
+# Build stage
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Herramientas para compilar better-sqlite3
-RUN apk add --no-cache python3 make g++
-
-COPY package.json package-lock.json* bun.lock* ./
-RUN bun install
+COPY package*.json ./
+RUN npm ci --only=production
 
 # Production stage
-FROM oven/bun:1-alpine
+FROM node:20-alpine
 
 WORKDIR /app
+
+# Dependencias para better-sqlite3 (módulo nativo)
+RUN apk add --no-cache python3 make g++
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
@@ -25,4 +25,4 @@ RUN addgroup -g 1001 -S app && \
 
 USER app
 
-CMD ["bun", "run", "src/index.js"]
+CMD ["node", "src/index.js"]

@@ -54,7 +54,7 @@ async function registerSlashCommands() {
   }
 }
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   console.log(`[Bot] Conectado como ${client.user.tag}`);
   console.log(`[Config] Moneda: ${config.currency.code} (${config.currency.symbol})`);
   await registerSlashCommands();
