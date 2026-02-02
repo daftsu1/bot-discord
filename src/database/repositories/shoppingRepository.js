@@ -52,6 +52,45 @@ export const shoppingRepository = {
     }
   },
 
+  updateItem(listId, itemName, { name, quantity, category, unit }) {
+    const updates = [];
+    const args = [];
+    if (name !== undefined) {
+      const trimmed = String(name).trim();
+      if (!trimmed) return null;
+      updates.push('name = ?');
+      args.push(trimmed.toLowerCase());
+    }
+    if (quantity !== undefined) {
+      updates.push('quantity = ?');
+      args.push(quantity);
+    }
+    if (category !== undefined) {
+      updates.push('category = ?');
+      args.push(category === null || category === '' ? null : category);
+    }
+    if (unit !== undefined) {
+      updates.push('unit = ?');
+      args.push(unit === null || unit === '' ? null : unit);
+    }
+    if (updates.length === 0) return this.getItems(listId).find(i => i.name.toLowerCase() === itemName.trim().toLowerCase());
+    updates.push("updated_at = datetime('now')");
+    args.push(listId, itemName.trim());
+    const stmt = db.prepare(`
+      UPDATE shopping_items SET ${updates.join(', ')}
+      WHERE list_id = ? AND LOWER(name) = LOWER(?)
+      RETURNING id, name, quantity, category, unit, is_purchased, price
+    `);
+    try {
+      return stmt.get(...args);
+    } catch (e) {
+      if (e.code === 'SQLITE_CONSTRAINT' && e.message?.includes('UNIQUE')) {
+        throw new Error('Ya existe un producto con ese nombre');
+      }
+      throw e;
+    }
+  },
+
   removeItem(listId, name) {
     const result = db.prepare(`
       DELETE FROM shopping_items 

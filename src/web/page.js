@@ -130,6 +130,32 @@ export function listPageHtml() {
       border: 1px solid var(--text-muted);
     }
     .btn.remove:hover { opacity: 0.9; }
+    .btn.edit {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .filter-bar select {
+      flex: 1;
+      max-width: 200px;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--surface-hover);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+    .filter-bar select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
     .btn.add {
       background: var(--accent);
       color: #0f172a;
@@ -295,6 +321,12 @@ export function listPageHtml() {
   <div id="loading">Cargando…</div>
   <div id="content" style="display:none;">
     <button type="button" class="btn add" id="btnAdd">+ Agregar producto</button>
+    <div class="filter-bar">
+      <label for="categoryFilter" style="font-size:0.8125rem;color:var(--text-muted);">Ver:</label>
+      <select id="categoryFilter">
+        <option value="">Todas</option>
+      </select>
+    </div>
     <div class="section" id="pendingSection">
       <h2>Por comprar</h2>
       <div id="pendingList"></div>
@@ -337,7 +369,8 @@ export function listPageHtml() {
         </div>
         <div class="form-group">
           <label for="addCategory">Categoría (opcional)</label>
-          <input type="text" id="addCategory" name="category" placeholder="ej: lácteos, frutas" maxlength="50" autocomplete="off">
+          <input type="text" id="addCategory" name="category" list="categorySuggestions" placeholder="ej: supermercado, carnicería" maxlength="50" autocomplete="off">
+          <datalist id="categorySuggestions"></datalist>
         </div>
         <div class="form-group">
           <label for="addUnit">Unidad (opcional)</label>
@@ -358,11 +391,49 @@ export function listPageHtml() {
     </div>
   </div>
 
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h3>Editar producto</h3>
+      <form id="editForm">
+        <input type="hidden" id="editItemName" name="itemName">
+        <div class="form-group">
+          <label for="editName">Producto *</label>
+          <input type="text" id="editName" name="name" required maxlength="100" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="editQuantity">Cantidad</label>
+          <input type="number" id="editQuantity" name="quantity" min="1" max="9999">
+        </div>
+        <div class="form-group">
+          <label for="editCategory">Categoría (opcional)</label>
+          <input type="text" id="editCategory" name="category" list="categorySuggestions" placeholder="ej: supermercado, carnicería" maxlength="50" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="editUnit">Unidad (opcional)</label>
+          <select id="editUnit" name="unit">
+            <option value="">—</option>
+            <option value="L">Litros</option>
+            <option value="ml">Mililitros</option>
+            <option value="kg">Kilogramos</option>
+            <option value="g">Gramos</option>
+            <option value="un">Unidades</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn remove" id="btnCancelEdit">Cancelar</button>
+          <button type="submit" class="btn done">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     const token = window.location.pathname.split('/').pop();
     const CACHE_KEY = 'despensa_cache_' + token;
     const QUEUE_KEY = 'despensa_queue_' + token;
+    const FILTER_KEY = 'despensa_filter_' + token;
     let localItems = null;
+    let currentFilter = localStorage.getItem(FILTER_KEY) || '';
 
     const api = (path, opts = {}) => fetch('/api/v/' + token + path, opts);
 
@@ -398,6 +469,41 @@ export function listPageHtml() {
       if (items) localStorage.setItem(CACHE_KEY, JSON.stringify(items));
     }
 
+    function getUniqueCategories(items) {
+      const cats = new Set();
+      for (const i of (items || [])) {
+        const c = (i.category || '').trim();
+        if (c) cats.add(c);
+      }
+      return Array.from(cats).sort((a, b) => a.localeCompare(b, 'es'));
+    }
+
+    function getAllCategoriesForFilter(items) {
+      const cats = new Set();
+      for (const i of (items || [])) {
+        cats.add((i.category || '').trim() || 'Sin categoría');
+      }
+      return Array.from(cats).sort((a, b) => {
+        if (a === 'Sin categoría') return 1;
+        if (b === 'Sin categoría') return -1;
+        return a.localeCompare(b, 'es');
+      });
+    }
+
+    function updateCategorySuggestions() {
+      const cats = getUniqueCategories(localItems || []);
+      const dl = document.getElementById('categorySuggestions');
+      dl.innerHTML = cats.map(c => '<option value="' + escapeHtml(c) + '">').join('');
+    }
+
+    function filterItems(items, filter) {
+      if (!filter) return items;
+      return items.filter(i => {
+        const cat = (i.category || '').trim() || 'Sin categoría';
+        return cat === filter;
+      });
+    }
+
     function updateOfflineBanner() {
       const banner = document.getElementById('offlineBanner');
       if (navigator.onLine) {
@@ -426,6 +532,14 @@ export function listPageHtml() {
       } else if (type === 'remove') {
         const idx = list.findIndex(i => i.name.toLowerCase() === (payload.itemName || '').toLowerCase());
         if (idx >= 0) list.splice(idx, 1);
+      } else if (type === 'update' && payload.itemName) {
+        const it = list.find(i => i.name.toLowerCase() === (payload.itemName || '').toLowerCase());
+        if (it) {
+          if (payload.name !== undefined) it.name = (payload.name || '').trim();
+          if (payload.quantity !== undefined) it.quantity = payload.quantity;
+          if (payload.category !== undefined) it.category = payload.category;
+          if (payload.unit !== undefined) it.unit = payload.unit;
+        }
       } else if (type === 'add' && payload.name) {
         const n = (payload.name || '').trim().toLowerCase();
         const existing = list.find(i => i.name.toLowerCase() === n);
@@ -515,18 +629,26 @@ export function listPageHtml() {
     function render(items) {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('content').style.display = 'block';
-      const pending = items.filter(i => !i.is_purchased);
-      const done = items.filter(i => i.is_purchased);
+      const allCategories = getAllCategoriesForFilter(items);
+      const filterSelect = document.getElementById('categoryFilter');
+      filterSelect.innerHTML = '<option value="">Todas</option>' + allCategories.map(c =>
+        '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>'
+      ).join('');
+      if (!currentFilter || !allCategories.includes(currentFilter)) currentFilter = '';
+      filterSelect.value = currentFilter;
+
+      const pending = filterItems(items.filter(i => !i.is_purchased), currentFilter);
+      const done = filterItems(items.filter(i => i.is_purchased), currentFilter);
       const totalPrice = done.reduce((sum, i) => sum + (i.price != null ? Number(i.price) * (i.quantity || 1) : 0), 0);
       document.getElementById('pendingSection').style.display = pending.length ? 'block' : 'none';
       document.getElementById('doneSection').style.display = done.length ? 'block' : 'none';
       document.getElementById('pendingList').innerHTML = pending.length
         ? renderGroupedHtml(pending, false)
-        : '<p class="empty">Nada pendiente</p>';
+        : '<p class="empty">' + (currentFilter ? 'Nada pendiente en esta categoría' : 'Nada pendiente') + '</p>';
       const doneHtml = done.length
         ? renderGroupedHtml(done, true) +
           (totalPrice > 0 ? '<p class="total-price">Total: ' + formatPrice(totalPrice) + '</p>' : '')
-        : '<p class="empty">Ninguno comprado aún</p>';
+        : '<p class="empty">' + (currentFilter ? 'Ninguno comprado en esta categoría' : 'Ninguno comprado aún') + '</p>';
       document.getElementById('doneList').innerHTML = doneHtml;
     }
 
@@ -544,14 +666,15 @@ export function listPageHtml() {
       const cat = showCategory && item.category ? ' <span class="cat">' + escapeHtml(item.category) + '</span>' : '';
       const pricePart = isDone && item.price != null ? ' <span class="price">' + formatPrice(item.price) + '</span>' : '';
       const removeBtn = '<button class="btn remove" type="button" title="Quitar de la lista">Quitar</button>';
+      const editBtn = '<button class="btn edit edit-btn" type="button" title="Editar">Editar</button>';
       if (isDone) {
         return '<div class="item done" data-name="' + escapeHtml(item.name) + '">' +
           '<span class="label">' + escapeHtml(item.name) + qtyPart + cat + pricePart + '</span>' +
-          '<div class="item-actions">' + removeBtn + '<button class="btn undo" type="button">Desmarcar</button></div></div>';
+          '<div class="item-actions">' + editBtn + removeBtn + '<button class="btn undo" type="button">Desmarcar</button></div></div>';
       }
       return '<div class="item" data-name="' + escapeHtml(item.name) + '">' +
         '<span class="label">' + escapeHtml(item.name) + qtyPart + cat + '</span>' +
-        '<div class="item-actions">' + removeBtn + '<button class="btn done mark-btn" type="button">✓ Marcar comprado</button></div></div>';
+        '<div class="item-actions">' + editBtn + removeBtn + '<button class="btn done mark-btn" type="button">✓ Marcar comprado</button></div></div>';
     }
 
     function escapeHtml(s) {
@@ -560,11 +683,11 @@ export function listPageHtml() {
       return div.innerHTML;
     }
 
-    async function doAction(path, body, localType, localPayload) {
+    async function doAction(path, body, localType, localPayload, method) {
       if (navigator.onLine) {
         try {
           const r = await api(path, {
-            method: 'POST',
+            method: method || 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
           });
@@ -582,7 +705,7 @@ export function listPageHtml() {
         localItems = applyLocalAction(localType, localPayload);
         setCachedItems(localItems);
         render(localItems);
-        addToQueue({ type: localType, path, body });
+        addToQueue({ type: localType, path, body, method: method || 'POST' });
         updateOfflineBanner();
       }
     }
@@ -593,8 +716,27 @@ export function listPageHtml() {
       const btn = e.target.closest('button');
       if (!btn) return;
       if (btn.id === 'btnAdd') {
+        updateCategorySuggestions();
         document.getElementById('addModal').classList.add('open');
         document.getElementById('addName').focus();
+        return;
+      }
+      if (btn.id === 'btnCancelEdit') {
+        document.getElementById('editModal').classList.remove('open');
+        return;
+      }
+      if (btn.classList.contains('edit-btn')) {
+        const item = (localItems || []).find(i => i.name === name);
+        if (item) {
+          document.getElementById('editItemName').value = item.name;
+          document.getElementById('editName').value = item.name;
+          document.getElementById('editQuantity').value = item.quantity || 1;
+          document.getElementById('editCategory').value = item.category || '';
+          document.getElementById('editUnit').value = item.unit || '';
+          updateCategorySuggestions();
+          document.getElementById('editModal').classList.add('open');
+          document.getElementById('editName').focus();
+        }
         return;
       }
       if (btn.id === 'btnCancel') {
@@ -617,11 +759,11 @@ export function listPageHtml() {
         document.getElementById('markPrice').focus();
         return;
       }
-      let path = '/items/mark', type = 'mark';
+      let path = '/items/mark', type = 'mark', method = 'POST';
       if (btn.classList.contains('undo')) { path = '/items/unmark'; type = 'unmark'; }
       if (btn.classList.contains('remove')) { path = '/items/remove'; type = 'remove'; }
       const body = { itemName: name };
-      await doAction(path, body, type, { itemName: name });
+      await doAction(path, body, type, { itemName: name }, method);
     });
 
     document.getElementById('markForm').addEventListener('submit', async (e) => {
@@ -646,11 +788,58 @@ export function listPageHtml() {
         pendingMarkName = null;
       }
     });
+    document.getElementById('editModal').addEventListener('click', (e) => {
+      if (e.target.id === 'editModal') document.getElementById('editModal').classList.remove('open');
+    });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         document.getElementById('addModal').classList.remove('open');
         document.getElementById('markModal').classList.remove('open');
+        document.getElementById('editModal').classList.remove('open');
         pendingMarkName = null;
+      }
+    });
+
+    document.getElementById('categoryFilter').addEventListener('change', (e) => {
+      currentFilter = e.target.value || '';
+      localStorage.setItem(FILTER_KEY, currentFilter);
+      render(localItems || []);
+    });
+
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const itemName = document.getElementById('editItemName').value.trim();
+      const name = document.getElementById('editName').value.trim();
+      const quantity = parseInt(document.getElementById('editQuantity').value, 10) || 1;
+      const category = document.getElementById('editCategory').value.trim() || null;
+      const unit = document.getElementById('editUnit').value || null;
+      if (!itemName || !name) return;
+      document.getElementById('editModal').classList.remove('open');
+      const body = { itemName, name, quantity, category: category || undefined, unit: unit || undefined };
+      const payload = { itemName, name, quantity, category, unit };
+
+      if (navigator.onLine) {
+        try {
+          const r = await api('/items', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'Error al actualizar');
+          document.getElementById('error').style.display = 'none';
+          load();
+        } catch (err) {
+          document.getElementById('error').textContent = err.message;
+          document.getElementById('error').style.display = 'block';
+        }
+      } else {
+        localItems = applyLocalAction('update', payload);
+        setCachedItems(localItems);
+        render(localItems);
+        addToQueue({ type: 'update', path: '/items', body, method: 'PATCH' });
+        document.getElementById('error').style.display = 'none';
+        updateOfflineBanner();
       }
     });
 
@@ -703,7 +892,7 @@ export function listPageHtml() {
       for (const a of q) {
         try {
           const r = await api(a.path, {
-            method: 'POST',
+            method: a.method || 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(a.body)
           });

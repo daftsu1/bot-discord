@@ -136,6 +136,37 @@ export function createWebServer() {
     }
   });
 
+  /** API: actualizar ítem de la lista. */
+  app.patch('/api/v/:token/items', resolveList, (req, res) => {
+    try {
+      const { listId } = req.listContext;
+      const { itemName, name, quantity, category, unit } = req.body || {};
+      if (!itemName || typeof itemName !== 'string') {
+        return res.status(400).json({ error: 'itemName requerido' });
+      }
+      const validName = name !== undefined ? validateProductName(name) : undefined;
+      const validQuantity = quantity !== undefined ? validateQuantity(quantity) : undefined;
+      const validCategory = category !== undefined ? validateCategory(category) : undefined;
+      const validUnit = unit !== undefined ? validateUnit(unit) : undefined;
+      const result = shoppingRepository.updateItem(listId, itemName.trim(), {
+        name: validName,
+        quantity: validQuantity,
+        category: validCategory,
+        unit: validUnit
+      });
+      if (!result) {
+        return res.status(404).json({ error: 'No se encontró el producto en la lista' });
+      }
+      res.json({ ok: true, item: result });
+    } catch (err) {
+      if (err.message?.includes('obligatorio') || err.message?.includes('Ya existe')) {
+        return res.status(400).json({ error: err.message });
+      }
+      console.error('[Web] PATCH items:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   /** API: quitar ítem de la lista. */
   app.post('/api/v/:token/items/remove', resolveList, (req, res) => {
     try {
