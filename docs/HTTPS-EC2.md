@@ -2,6 +2,12 @@
 
 Guía para poner tu bot tras HTTPS usando tu hostname de No-IP (ej: `bot-listas.ddns.net`).
 
+## Nota sobre el deploy
+
+El deploy por GitHub Actions **no se ve afectado**. Nginx corre en el host; el workflow sigue haciendo `git pull` y `docker compose up -d --build` sobre tu app. Solo asegúrate de que la ruta en el workflow coincida con tu carpeta (`bot-discord-despensa` o la que uses).
+
+---
+
 ## Requisitos previos
 
 - Instancia EC2 (Amazon Linux 2)
