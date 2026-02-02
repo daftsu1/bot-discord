@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateProductName, validateQuantity, validateCategory, LIMITS } from './index.js';
+import { validateProductName, validateQuantity, validateCategory, validateUnit, LIMITS } from './index.js';
 
 describe('validateProductName', () => {
   it('rechaza null o undefined', () => {
@@ -71,5 +71,27 @@ describe('validateCategory', () => {
   it('acepta categoría válida y devuelve trim', () => {
     expect(validateCategory('  lácteos  ')).toBe('lácteos');
     expect(validateCategory('frutas')).toBe('frutas');
+  });
+});
+
+describe('validateUnit', () => {
+  it('devuelve null para null, undefined o string vacío', () => {
+    expect(validateUnit(null)).toBeNull();
+    expect(validateUnit(undefined)).toBeNull();
+    expect(validateUnit('')).toBeNull();
+    expect(validateUnit('   ')).toBeNull();
+  });
+
+  it('rechaza unidad mayor al límite', () => {
+    const long = 'a'.repeat(LIMITS.UNIT_MAX_LENGTH + 1);
+    expect(() => validateUnit(long)).toThrow(
+      `La unidad no puede tener más de ${LIMITS.UNIT_MAX_LENGTH} caracteres`
+    );
+  });
+
+  it('acepta unidad válida y devuelve trim', () => {
+    expect(validateUnit('  L  ')).toBe('L');
+    expect(validateUnit('kg')).toBe('kg');
+    expect(validateUnit('ml')).toBe('ml');
   });
 });

@@ -55,4 +55,19 @@ export function validateCategory(category) {
   return trimmed;
 }
 
+/**
+ * Valida la unidad de medida (opcional): L, ml, kg, g, un, etc.
+ * @param {string|null|undefined} unit
+ * @returns {string|null}
+ */
+export function validateUnit(unit) {
+  if (unit == null || unit === '') return null;
+  const trimmed = String(unit).trim();
+  if (!trimmed) return null;
+  if (trimmed.length > LIMITS.UNIT_MAX_LENGTH) {
+    throw new Error(`La unidad no puede tener más de ${LIMITS.UNIT_MAX_LENGTH} caracteres`);
+  }
+  return trimmed;
+}
+
 export { LIMITS };

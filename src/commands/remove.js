@@ -22,6 +22,7 @@ export const command = {
       shoppingService.removeItem(
         interaction.guildId,
         interaction.channelId,
+        interaction.user.id,
         product
       );
 

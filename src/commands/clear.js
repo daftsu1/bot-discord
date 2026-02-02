@@ -19,6 +19,7 @@ export const command = {
       const { deleted } = shoppingService.clearList(
         interaction.guildId,
         interaction.channelId,
+        interaction.user.id,
         { purchasedOnly }
       );
 

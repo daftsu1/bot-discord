@@ -11,7 +11,10 @@ export const command = {
     const embed = new EmbedBuilder()
       .setColor(0x3498db)
       .setTitle('🛒 Comandos disponibles')
-      .setDescription('Lista de compras por canal. Cada canal tiene su propia lista.')
+      .setDescription(
+        'En cada canal puedes **unirte a una lista grupal** (varios usuarios) o usar **tu lista personal**. ' +
+        '`/crear-lista` + `/unirse` para trabajar en conjunto; `/mi-lista` para tu lista solo.'
+      )
       .setFooter({ text: 'Bot Despensa' })
       .setTimestamp();
 

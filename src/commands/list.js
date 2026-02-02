@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { shoppingService } from '../services/shoppingService.js';
+import { listService } from '../services/listService.js';
 
 export const command = {
   data: new SlashCommandBuilder()
@@ -19,8 +20,16 @@ export const command = {
       const items = shoppingService.getList(
         interaction.guildId,
         interaction.channelId,
+        interaction.user.id,
         { includePurchased }
       );
+
+      const currentList = listService.getCurrentList(
+        interaction.guildId,
+        interaction.channelId,
+        interaction.user.id
+      );
+      const listLabel = currentList ? listService.getListDisplayName(currentList, interaction.user.id) : '';
 
       if (items.length === 0) {
         return interaction.editReply({
@@ -33,8 +42,8 @@ export const command = {
 
       const embed = new EmbedBuilder()
         .setColor(0x2ecc71)
-        .setTitle('🛒 Lista de compras')
-        .setFooter({ text: `Canal #${interaction.channel?.name || 'actual'}` })
+        .setTitle('🛒 Lista de compras' + (listLabel ? ` · ${listLabel}` : ''))
+        .setFooter({ text: listLabel ? `Lista: ${listLabel} · #${interaction.channel?.name || 'actual'}` : `Canal #${interaction.channel?.name || 'actual'}` })
         .setTimestamp();
 
       if (pending.length > 0) {
@@ -79,7 +88,9 @@ function formatItems(grouped, strikethrough = false) {
     const list = grouped.get(category);
     if (category) lines.push(`**${category}**`);
     for (const item of list) {
-      const qty = item.quantity > 1 ? ` x${item.quantity}` : '';
+      const qty = item.unit
+        ? ` · ${item.quantity} ${item.unit}`
+        : (item.quantity > 1 ? ` x${item.quantity}` : '');
       const text = `${item.name}${qty}`;
       const formatted = strikethrough ? `~~${text}~~` : `• ${text}`;
       lines.push(formatted);

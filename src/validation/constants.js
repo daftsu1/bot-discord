@@ -9,5 +9,7 @@ export const LIMITS = {
   /** Longitud máxima de la categoría (caracteres) */
   CATEGORY_MAX_LENGTH: 50,
   /** Cantidad máxima por ítem (evita números desproporcionados) */
-  QUANTITY_MAX: 9999
+  QUANTITY_MAX: 9999,
+  /** Longitud máxima de la unidad (L, ml, kg, g, un, etc.) */
+  UNIT_MAX_LENGTH: 10
 };

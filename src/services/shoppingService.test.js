@@ -36,12 +36,12 @@ describe('shoppingService', () => {
     });
 
     it('llama al repositorio con datos válidos y devuelve el ítem', () => {
-      const mockItem = { id: 1, name: 'leche', quantity: 2, category: 'lácteos', is_purchased: 0 };
+      const mockItem = { id: 1, name: 'leche', quantity: 2, category: 'lácteos', unit: 'L', is_purchased: 0 };
       vi.mocked(shoppingRepository.addItem).mockReturnValue(mockItem);
 
-      const result = shoppingService.addItem(GUILD, CHANNEL, 'leche', 2, 'lácteos');
+      const result = shoppingService.addItem(GUILD, CHANNEL, 'leche', 2, 'lácteos', 'L');
 
-      expect(shoppingRepository.addItem).toHaveBeenCalledWith(GUILD, CHANNEL, 'leche', 2, 'lácteos');
+      expect(shoppingRepository.addItem).toHaveBeenCalledWith(GUILD, CHANNEL, 'leche', 2, 'lácteos', 'L');
       expect(result).toEqual({ success: true, item: mockItem });
     });
   });

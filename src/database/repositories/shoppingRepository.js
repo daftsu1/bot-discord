@@ -1,43 +1,42 @@
 import { db } from '../connection.js';
 
 /**
- * Repositorio para operaciones de la lista de compras.
- * Separa la lógica de persistencia del negocio.
+ * Repositorio de ítems de la lista de compras. Los ítems pertenecen a una lista (list_id).
  */
-
 export const shoppingRepository = {
-  addItem(guildId, channelId, name, quantity = 1, category = null) {
+  addItem(listId, name, quantity = 1, category = null, unit = null) {
     const normalizedName = name.trim().toLowerCase();
     db.prepare(`
-      INSERT INTO shopping_items (guild_id, channel_id, name, quantity, category, updated_at)
+      INSERT INTO shopping_items (list_id, name, quantity, category, unit, updated_at)
       VALUES (?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(guild_id, channel_id, name) DO UPDATE SET
+      ON CONFLICT(list_id, name) DO UPDATE SET
         quantity = quantity + excluded.quantity,
         category = COALESCE(excluded.category, category),
+        unit = COALESCE(excluded.unit, unit),
         updated_at = datetime('now')
-    `).run(guildId, channelId, normalizedName, quantity, category);
+    `).run(listId, normalizedName, quantity, category, unit);
 
     return db.prepare(`
-      SELECT id, name, quantity, category, is_purchased
+      SELECT id, name, quantity, category, unit, is_purchased
       FROM shopping_items 
-      WHERE guild_id = ? AND channel_id = ? AND LOWER(name) = ?
-    `).get(guildId, channelId, normalizedName);
+      WHERE list_id = ? AND LOWER(name) = ?
+    `).get(listId, normalizedName);
   },
 
-  removeItem(guildId, channelId, name) {
+  removeItem(listId, name) {
     const result = db.prepare(`
       DELETE FROM shopping_items 
-      WHERE guild_id = ? AND channel_id = ? AND LOWER(name) = LOWER(?)
+      WHERE list_id = ? AND LOWER(name) = LOWER(?)
       RETURNING id
-    `).run(guildId, channelId, name.trim());
+    `).run(listId, name.trim());
     return { rowCount: result.changes };
   },
 
-  getItems(guildId, channelId, { includePurchased = true } = {}) {
+  getItems(listId, { includePurchased = true } = {}) {
     let query = `
-      SELECT id, name, quantity, category, is_purchased, purchased_at, purchased_by
+      SELECT id, name, quantity, category, unit, is_purchased, purchased_at, purchased_by
       FROM shopping_items 
-      WHERE guild_id = ? AND channel_id = ?
+      WHERE list_id = ?
     `;
     if (!includePurchased) {
       query += ` AND is_purchased = 0`;
@@ -45,35 +44,35 @@ export const shoppingRepository = {
     query += ` ORDER BY category, name`;
 
     const stmt = db.prepare(query);
-    return stmt.all(guildId, channelId);
+    return stmt.all(listId);
   },
 
-  markAsPurchased(guildId, channelId, itemName, userId) {
+  markAsPurchased(listId, itemName, userId) {
     const stmt = db.prepare(`
       UPDATE shopping_items 
       SET is_purchased = 1, purchased_at = datetime('now'), purchased_by = ?, updated_at = datetime('now')
-      WHERE guild_id = ? AND channel_id = ? AND LOWER(name) = LOWER(?)
-      RETURNING id, name, quantity, category
+      WHERE list_id = ? AND LOWER(name) = LOWER(?)
+      RETURNING id, name, quantity, category, unit
     `);
-    return stmt.get(userId, guildId, channelId, itemName.trim());
+    return stmt.get(userId, listId, itemName.trim());
   },
 
-  unmarkAsPurchased(guildId, channelId, itemName) {
+  unmarkAsPurchased(listId, itemName) {
     const stmt = db.prepare(`
       UPDATE shopping_items 
       SET is_purchased = 0, purchased_at = NULL, purchased_by = NULL, updated_at = datetime('now')
-      WHERE guild_id = ? AND channel_id = ? AND LOWER(name) = LOWER(?)
-      RETURNING id, name, quantity, category
+      WHERE list_id = ? AND LOWER(name) = LOWER(?)
+      RETURNING id, name, quantity, category, unit
     `);
-    return stmt.get(guildId, channelId, itemName.trim());
+    return stmt.get(listId, itemName.trim());
   },
 
-  clearList(guildId, channelId, { purchasedOnly = false } = {}) {
-    let query = `DELETE FROM shopping_items WHERE guild_id = ? AND channel_id = ?`;
+  clearList(listId, { purchasedOnly = false } = {}) {
+    let query = `DELETE FROM shopping_items WHERE list_id = ?`;
     if (purchasedOnly) {
       query += ` AND is_purchased = 1`;
     }
-    const result = db.prepare(query).run(guildId, channelId);
+    const result = db.prepare(query).run(listId);
     return { rowCount: result.changes };
   }
 };

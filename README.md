@@ -1,22 +1,65 @@
 # Bot Discord Alacena
 
-Bot de Discord para gestionar la lista de compras del supermercado, con soporte para cantidades, categorías y marcado de comprados.
+Bot de Discord para gestionar la lista de compras del supermercado, con soporte para cantidades, categorías, marcado de comprados, **listas grupales** (varios usuarios en la misma lista) y **lista personal** por usuario.
 
-## Módulo 1: Lista de compras
+## Listas en un canal
 
-- **/ayuda** – Muestra los comandos disponibles del bot
-- **/agregar** – Añade productos (con cantidad y categoría opcionales)
-- **/quitar** – Elimina un producto de la lista
-- **/lista** – Muestra la lista (incluye o excluye comprados)
-- **/limpiar** – Vacía la lista (total o solo comprados)
-- **/marcar** – Marca como comprado o vuelve a pendiente
-- **/ver-lista** – Genera un link para ver y marcar la lista desde el celular (o cualquier navegador)
+En cada canal puedes:
 
-Cada canal de texto tiene su propia lista.
+- **Trabajar en grupo** → Alguien crea una lista con `/crear-lista` (ej. `piso`, `familia`). Los demás se unen con `/unirse lista:nombre`. Todos agregan, marcan y ven la misma lista.
+- **Usar tu lista personal** → `/mi-lista` crea o activa una lista solo tuya en ese canal; nadie más la ve ni la edita.
+- **Tener varias listas** → Puedes crear varias listas grupales con nombres distintos (ej. `piso`, `casa-mamá`). Cada una es independiente. Con `/usar-lista` eliges cuál usar; `/agregar`, `/lista`, `/quitar`, etc. afectan siempre a la lista que tengas activa.
+
+### Lista completada → crear otra nueva
+
+Si con tu grupo completan una lista (todo comprado) y quieren empezar otra:
+
+1. La lista actual **queda como está** (todos los ítems siguen marcados como comprados; sirve de historial).
+2. Alguien crea una nueva lista: `/crear-lista nombre` (ej. `piso-semana2` o `compras-abril`).
+3. El resto se une: `/unirse lista:nombre`.
+4. Todos cambian a la nueva lista: `/usar-lista lista:nombre`.
+
+A partir de ahí trabajan en la nueva lista. La anterior sigue existiendo; si quieren pueden eliminarla con `/eliminar-lista` (solo el creador de la lista puede eliminarla).
+
+---
+
+## Comandos
+
+### Ayuda y listas (elegir en qué lista trabajas)
+
+| Comando | Descripción |
+|--------|-------------|
+| **/ayuda** | Muestra todos los comandos del bot. |
+| **/crear-lista** `nombre` | Crea una **lista grupal** en el canal. Tú quedas dentro; otros se unen con `/unirse`. Puedes crear tantas como quieras (nombres distintos). |
+| **/mi-lista** | Activa **tu lista personal** en este canal (solo tú la ves y editas). Si no existía, se crea. |
+| **/unirse** `lista` | Te unes a una lista grupal del canal para ver y editar con otros. |
+| **/salir** `lista` | Sales de una lista grupal (no borra la lista ni los productos). No aplica a "general" ni a tu lista personal. |
+| **/usar-lista** `lista` | Elige qué lista usar en este canal. Opción: `mi lista` para tu lista personal. `/agregar`, `/lista`, etc. afectan a esta lista. |
+| **/eliminar-lista** `lista` | **Elimina** una lista y todos sus productos. Solo el **creador** de la lista puede eliminarla. No se puede eliminar la lista "general". Para tu lista personal puedes usar `lista: mi lista`. |
+
+### Productos (sobre la lista que tengas activa)
+
+| Comando | Descripción |
+|--------|-------------|
+| **/agregar** `producto` [cantidad] [categoría] [unidad] | Añade un producto. Unidad opcional: L, ml, kg, g, un, etc. |
+| **/quitar** `producto` | Quita un producto de la lista. |
+| **/lista** [incluir_comprados] | Muestra la lista (por defecto incluye comprados). |
+| **/limpiar** [solo_comprados] | Vacía la lista. Con `solo_comprados: true` solo borra los marcados como comprados. |
+| **/marcar** `comprado` / `pendiente` `producto` | Marca como comprado o vuelve a pendiente. |
+| **/ver-lista** [lista] | Genera un **link** para ver y marcar la lista desde el celular. Si no pones lista, usa la que tengas activa. |
+
+---
 
 ### Vista web (celular)
 
-Usa **/ver-lista** en un canal: el bot te devuelve un **link privado** para ese canal. Abre el link en el navegador del celular para ver la lista e ir marcando lo que compraste (o desmarcar). El link es estable: puedes guardarlo en favoritos. Configura `WEB_BASE_URL` en `.env` con la URL pública (ej. `http://TU_IP:3000` en EC2) para que el link funcione fuera de tu red.
+Usa **/ver-lista** en un canal: el bot te devuelve un **link privado** para ese canal. Desde la web puedes:
+- **Ver** la lista (por comprar y comprados).
+- **Marcar comprado** / **Desmarcar**.
+- **Quitar** un ítem de la lista (mismo efecto que `/quitar` en Discord).
+
+El link es estable; puedes guardarlo en favoritos. Configura `WEB_BASE_URL` en `.env` con la URL pública (ej. `http://TU_IP:3000` en EC2) para que funcione fuera de tu red.
+
+**Editar** un ítem (cambiar cantidad, unidad, etc.) por ahora solo desde Discord: usa `/quitar` y vuelve a `/agregar` con los datos correctos. Un comando `/editar` o edición desde la web se puede añadir más adelante.
 
 ## Requisitos
 

@@ -38,6 +38,7 @@ export const command = {
         shoppingService.markAsPurchased(
           interaction.guildId,
           interaction.channelId,
+          interaction.user.id,
           product,
           interaction.user.id
         );
@@ -48,6 +49,7 @@ export const command = {
         shoppingService.unmarkAsPurchased(
           interaction.guildId,
           interaction.channelId,
+          interaction.user.id,
           product
         );
         await interaction.editReply({

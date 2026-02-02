@@ -22,6 +22,18 @@ export const command = {
       opt.setName('categoria')
         .setDescription('Categoría (ej: lácteos, frutas)')
         .setMaxLength(LIMITS.CATEGORY_MAX_LENGTH)
+    )
+    .addStringOption(opt =>
+      opt.setName('unidad')
+        .setDescription('Unidad: L, ml, kg, g, un (opcional)')
+        .setMaxLength(LIMITS.UNIT_MAX_LENGTH)
+        .addChoices(
+          { name: 'Litros', value: 'L' },
+          { name: 'Mililitros', value: 'ml' },
+          { name: 'Kilogramos', value: 'kg' },
+          { name: 'Gramos', value: 'g' },
+          { name: 'Unidades', value: 'un' }
+        )
     ),
 
   async execute(interaction) {
@@ -30,19 +42,23 @@ export const command = {
     const product = interaction.options.getString('producto');
     const quantity = interaction.options.getInteger('cantidad') ?? 1;
     const category = interaction.options.getString('categoria');
+    const unit = interaction.options.getString('unidad');
 
     try {
       const { item } = shoppingService.addItem(
         interaction.guildId,
         interaction.channelId,
+        interaction.user.id,
         product,
         quantity,
-        category
+        category,
+        unit
       );
 
       const categoryStr = item.category ? ` [${item.category}]` : '';
+      const unitStr = item.unit ? ` · ${item.quantity} ${item.unit}` : ` x${item.quantity}`;
       await interaction.editReply({
-        content: `✅ **${item.name}** x${item.quantity}${categoryStr} agregado a la lista.`
+        content: `✅ **${item.name}**${unitStr}${categoryStr} agregado a la lista.`
       });
     } catch (err) {
       await interaction.editReply({
