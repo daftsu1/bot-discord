@@ -25,5 +25,15 @@ export function initSchema() {
       ON shopping_items(guild_id, channel_id);
     CREATE INDEX IF NOT EXISTS idx_shopping_purchased 
       ON shopping_items(is_purchased);
+
+    CREATE TABLE IF NOT EXISTS channel_tokens (
+      token TEXT PRIMARY KEY,
+      guild_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(guild_id, channel_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_channel_tokens_lookup 
+      ON channel_tokens(guild_id, channel_id);
   `);
 }

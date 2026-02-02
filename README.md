@@ -10,8 +10,13 @@ Bot de Discord para gestionar la lista de compras del supermercado, con soporte 
 - **/lista** – Muestra la lista (incluye o excluye comprados)
 - **/limpiar** – Vacía la lista (total o solo comprados)
 - **/marcar** – Marca como comprado o vuelve a pendiente
+- **/ver-lista** – Genera un link para ver y marcar la lista desde el celular (o cualquier navegador)
 
 Cada canal de texto tiene su propia lista.
+
+### Vista web (celular)
+
+Usa **/ver-lista** en un canal: el bot te devuelve un **link privado** para ese canal. Abre el link en el navegador del celular para ver la lista e ir marcando lo que compraste (o desmarcar). El link es estable: puedes guardarlo en favoritos. Configura `WEB_BASE_URL` en `.env` con la URL pública (ej. `http://TU_IP:3000` en EC2) para que el link funcione fuera de tu red.
 
 ## Requisitos
 
@@ -83,7 +88,7 @@ El proyecto incluye un **Dockerfile** con [Bun](https://bun.sh) y **docker-compo
 
 ### 1. En tu máquina: preparar `.env`
 
-Copia `.env.example` a `.env`, rellena `DISCORD_BOT_TOKEN` y `DISCORD_CLIENT_ID`, y súbelo a la instancia (o créalo allí y pega los valores).
+Copia `.env.example` a `.env`, rellena `DISCORD_BOT_TOKEN` y `DISCORD_CLIENT_ID`, y súbelo a la instancia (o créalo allí y pega los valores). Si quieres usar la vista web en el celular (**/ver-lista**), añade `WEB_BASE_URL=http://TU_IP_PUBLICA:3000` (reemplaza por la IP de tu EC2) y abre el **puerto 3000** en el grupo de seguridad de la instancia (inbound rule TCP 3000 desde tu IP o 0.0.0.0/0 si quieres acceder desde cualquier red).
 
 ### 2. En la instancia EC2
 

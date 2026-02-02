@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { Client, GatewayIntentBits, Collection, REST, Routes } from 'discord.js';
 import { initSchema } from './database/schema.js';
 import { config } from './config/index.js';
+import { createWebServer } from './web/server.js';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { readdirSync } from 'fs';
 import path from 'path';
@@ -89,6 +90,7 @@ async function main() {
   }
 
   initSchema();
+  createWebServer();
   await loadCommands();
 
   await client.login(token);

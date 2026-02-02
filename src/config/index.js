@@ -14,5 +14,11 @@ export const config = {
   /** Base de datos (SQLite por defecto, migrable a PostgreSQL) */
   database: {
     path: process.env.DATABASE_PATH || './data/bot.db'
+  },
+
+  /** Vista web (lista en el celular) */
+  web: {
+    port: parseInt(process.env.WEB_PORT || '3000', 10),
+    baseUrl: process.env.WEB_BASE_URL || 'http://localhost:3000'
   }
 };

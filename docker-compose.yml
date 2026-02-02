@@ -7,4 +7,6 @@ services:
     env_file: .env
     volumes:
       - ./data:/app/data
-    # Para EC2: el bot solo hace conexiones salientes a Discord; no necesita puertos publicados
+    ports:
+      - "3000:3000"
+    # Puerto 3000: vista web de la lista (link que devuelve /ver-lista). En EC2 configura WEB_BASE_URL (ej. http://TU_IP:3000).
