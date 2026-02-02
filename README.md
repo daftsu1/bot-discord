@@ -163,7 +163,19 @@ Si obtienes `unknown shorthand flag: 'd'`, tu instalación usa el binario clási
 
 El volumen `./data` persiste la base SQLite en el host, así que los datos se mantienen al actualizar la imagen.
 
-**CI/CD más adelante:** Con SSH configurado, puedes añadir un pipeline (p. ej. GitHub Actions) que se conecte por SSH a esta instancia y ejecute `git pull && docker compose up -d --build` (o `docker-compose up -d --build` si usas el binario con guión), o usar la misma clave como deploy key para que la instancia haga pull automático.
+### CI/CD con GitHub Actions
+
+Al hacer **push a `main` o `master`**, un workflow despliega automáticamente en EC2: se conecta por SSH, hace `git pull` y ejecuta `docker compose up -d --build`.
+
+**Secrets que debes configurar en el repo** (Settings → Secrets and variables → Actions → New repository secret):
+
+| Secret          | Descripción |
+|-----------------|-------------|
+| `EC2_HOST`      | IP pública o hostname de la instancia EC2 (ej. `3.12.34.56` o `ec2-3-12-34-56.compute-1.amazonaws.com`) |
+| `EC2_USER`      | Usuario SSH en la instancia: `ec2-user` (Amazon Linux) o `ubuntu` (Ubuntu) |
+| `EC2_SSH_KEY`   | Contenido completo del archivo `.pem` (clave privada) que usas para conectarte a EC2 por SSH. Copia todo el archivo, incluidas las líneas `-----BEGIN ... KEY-----` y `-----END ... KEY-----`. |
+
+**Ruta del proyecto en EC2:** el workflow asume que el repo está en `~/proyectos/bot-discord-despensa`. Si clonaste en otra ruta (por ejemplo `~/proyectos/bot-discord`), edita `.github/workflows/deploy.yml` y cambia la línea del `cd` en el `script`.
 
 ### Build solo con Docker (sin compose)
 
