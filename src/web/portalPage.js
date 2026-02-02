@@ -96,19 +96,39 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+function groupListsByChannel(lists) {
+  const groups = new Map();
+  for (const l of lists) {
+    const key = `${l.guildId}:${l.channelId}`;
+    const label = `${escapeHtml(l.guildName || '')} › #${escapeHtml(l.channelName || 'canal')}`;
+    if (!groups.has(key)) {
+      groups.set(key, { label, guildName: l.guildName, channelName: l.channelName, items: [] });
+    }
+    groups.get(key).items.push(l);
+  }
+  return groups;
+}
+
 export function dashboardPageHtml(user, lists, baseUrl) {
-  const listItems = lists.length === 0
-    ? '<p class="empty">No tienes listas aún. Usa el bot en Discord para crear listas y luego aparecerán aquí.</p>'
-    : lists.map(l => {
-        const link = `${baseUrl.replace(/\/$/, '')}/v/${l.token}`;
-        const badge = l.isOwner ? '<span class="badge owner">Tuya</span>' : '<span class="badge shared">Compartida</span>';
-        return `<a href="${link}" class="list-card">
-          <div class="list-info">
-            <span class="list-name">${escapeHtml(l.displayName)}</span>
-            ${badge}
-          </div>
-          <span class="list-arrow">→</span>
-        </a>`;
+  const groups = groupListsByChannel(lists);
+  const listSections = groups.size === 0
+    ? '<p class="empty">No tienes listas aún. Crea una desde el botón de abajo o usa el bot en Discord.</p>'
+    : [...groups.entries()].map(([key, g]) => {
+        const items = g.items.map(l => {
+          const link = `${baseUrl.replace(/\/$/, '')}/v/${l.token}`;
+          const badge = l.isOwner ? '<span class="badge owner">Tuya</span>' : '<span class="badge shared">Compartida</span>';
+          return `<a href="${link}" class="list-card">
+            <div class="list-info">
+              <span class="list-name">${escapeHtml(l.displayName)}</span>
+              ${badge}
+            </div>
+            <span class="list-arrow">→</span>
+          </a>`;
+        }).join('');
+        return `<div class="channel-group">
+          <h3 class="channel-label">${g.label}</h3>
+          <div class="channel-lists">${items}</div>
+        </div>`;
       }).join('');
 
   return `<!DOCTYPE html>
@@ -127,6 +147,7 @@ export function dashboardPageHtml(user, lists, baseUrl) {
       --bg: #0f172a;
       --surface: #1e293b;
       --surface-hover: #334155;
+      --border: #334155;
       --text: #f1f5f9;
       --text-muted: #94a3b8;
       --accent: #38bdf8;
@@ -200,6 +221,84 @@ export function dashboardPageHtml(user, lists, baseUrl) {
     .badge.owner { background: rgba(56, 189, 248, 0.2); color: var(--accent); }
     .badge.shared { background: rgba(52, 211, 153, 0.2); color: #34d399; }
     .list-arrow { color: var(--text-muted); font-size: 1.25rem; }
+    .channel-group { margin-bottom: 1.5rem; }
+    .channel-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0 0 0.5rem;
+    }
+    .channel-lists .list-card { margin-bottom: 0.5rem; }
+    .btn-add {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.875rem;
+      background: var(--accent);
+      color: #0f172a;
+      border: none;
+      border-radius: var(--radius);
+      font-weight: 600;
+      font-size: 0.9375rem;
+      cursor: pointer;
+      font-family: inherit;
+      margin-bottom: 1.5rem;
+      text-decoration: none;
+    }
+    .btn-add:hover { opacity: 0.95; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; visibility: visible; }
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      max-width: 360px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal h3 { margin: 0 0 1rem; font-size: 1.125rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.375rem;
+    }
+    .form-group select, .form-group input {
+      width: 100%;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid var(--surface-hover);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+    }
+    .form-row { display: flex; gap: 0.75rem; margin-top: 1rem; }
+    .form-row .btn { flex: 1; padding: 0.625rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: inherit; border: none; }
+    .form-row .btn-cancel { background: transparent; color: var(--text-muted); border: 1px solid var(--text-muted); }
+    .form-row .btn-submit { background: var(--accent); color: #0f172a; }
+    .form-row .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .form-check { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+    .form-check input { width: auto; }
     .empty {
       color: var(--text-muted);
       padding: 2rem;
@@ -219,10 +318,114 @@ export function dashboardPageHtml(user, lists, baseUrl) {
     <a href="/portal/logout" class="btn-logout">Cerrar sesión</a>
   </header>
   <h1>Mis listas</h1>
-  <p class="sub">Tus listas y las que te compartieron. Pulsa para abrir.</p>
-  <div class="lists">
-    ${listItems}
+  <p class="sub">Agrupadas por canal. Pulsa para abrir.</p>
+  <button type="button" class="btn-add" id="btnNewList">+ Nueva lista</button>
+  <div class="lists">${listSections}</div>
+
+  <div class="modal-overlay" id="createModal">
+    <div class="modal">
+      <h3>Nueva lista</h3>
+      <form id="createForm">
+        <div class="form-group">
+          <label for="createGuild">Servidor</label>
+          <select id="createGuild" required>
+            <option value="">Elige un servidor...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="createChannel">Canal</label>
+          <select id="createChannel" required disabled>
+            <option value="">Primero elige un servidor</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="createName">Nombre (para listas compartidas)</label>
+          <input type="text" id="createName" placeholder="ej: semanal, piso" maxlength="50" autocomplete="off">
+        </div>
+        <div class="form-check">
+          <input type="checkbox" id="createPersonal" checked>
+          <label for="createPersonal">Lista personal (solo tú)</label>
+        </div>
+        <div class="form-row">
+          <button type="button" class="btn btn-cancel" id="btnCancelCreate">Cancelar</button>
+          <button type="submit" class="btn btn-submit" id="btnSubmitCreate">Crear</button>
+        </div>
+      </form>
+    </div>
   </div>
+
+  <script>
+    const createModal = document.getElementById('createModal');
+    const createForm = document.getElementById('createForm');
+    const createGuild = document.getElementById('createGuild');
+    const createChannel = document.getElementById('createChannel');
+    const createName = document.getElementById('createName');
+    const createPersonal = document.getElementById('createPersonal');
+
+    document.getElementById('btnNewList').onclick = () => {
+      createModal.classList.add('open');
+      loadGuilds();
+    };
+    document.getElementById('btnCancelCreate').onclick = () => createModal.classList.remove('open');
+    createModal.addEventListener('click', e => { if (e.target === createModal) createModal.classList.remove('open'); });
+
+    createPersonal.addEventListener('change', () => {
+      createName.disabled = createPersonal.checked;
+      if (createPersonal.checked) createName.value = '';
+    });
+
+    async function loadGuilds() {
+      createGuild.innerHTML = '<option value="">Cargando...</option>';
+      const r = await fetch('/api/portal/guilds', { credentials: 'include' });
+      const guilds = await r.json();
+      createGuild.innerHTML = '<option value="">Elige un servidor...</option>' +
+        guilds.map(g => '<option value="' + g.id + '">' + (g.name || g.id) + '</option>').join('');
+      createChannel.innerHTML = '<option value="">Elige primero un servidor</option>';
+      createChannel.disabled = true;
+    }
+
+    createGuild.addEventListener('change', async () => {
+      const guildId = createGuild.value;
+      createChannel.innerHTML = '<option value="">Cargando...</option>';
+      createChannel.disabled = true;
+      if (!guildId) return;
+      const r = await fetch('/api/portal/guilds/' + guildId + '/channels', { credentials: 'include' });
+      const channels = await r.json();
+      createChannel.innerHTML = '<option value="">Elige un canal...</option>' +
+        channels.map(c => '<option value="' + c.id + '">#' + (c.name || c.id) + '</option>').join('');
+      createChannel.disabled = false;
+    });
+
+    createForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const isPersonal = createPersonal.checked;
+      const name = isPersonal ? 'mi-lista' : (createName.value.trim() || 'nueva');
+      const payload = {
+        guildId: createGuild.value,
+        channelId: createChannel.value,
+        name,
+        isPersonal
+      };
+      const btn = document.getElementById('btnSubmitCreate');
+      btn.disabled = true;
+      btn.textContent = 'Creando...';
+      try {
+        const r = await fetch('/api/portal/lists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Error');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Crear';
+      }
+    });
+  </script>
 </body>
 </html>`;
 }

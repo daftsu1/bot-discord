@@ -3,12 +3,14 @@ import { config } from '../config/index.js';
 import { channelTokenRepository } from '../database/repositories/channelTokenRepository.js';
 import { listTokenRepository } from '../database/repositories/listTokenRepository.js';
 import { listRepository } from '../database/repositories/listRepository.js';
+import { userListPreferenceRepository } from '../database/repositories/userListPreferenceRepository.js';
 import { shoppingRepository } from '../database/repositories/shoppingRepository.js';
 import { userListsRepository } from '../database/repositories/userListsRepository.js';
 import { validateProductName, validateQuantity, validateCategory, validateUnit } from '../validation/index.js';
 import { listPageHtml } from './page.js';
 import { loginPageHtml, dashboardPageHtml } from './portalPage.js';
 import { parseSession, setSessionCookie, clearSessionCookie } from './auth.js';
+import { fetchGuilds, fetchChannels, enrichListsWithChannelInfo } from './discordApi.js';
 
 const WEB_USER_ID = 'web';
 
@@ -197,18 +199,72 @@ export function createWebServer() {
     }
   });
 
-  app.get('/portal/dashboard', (req, res) => {
+  function requirePortalSession(req, res, next) {
     const session = parseSession(req);
     if (!session) {
+      if (req.path.startsWith('/api/')) {
+        return res.status(401).json({ error: 'No autenticado' });
+      }
       return res.redirect('/portal');
     }
-    const lists = userListsRepository.getListsForUser(session.userId);
+    req.portalSession = session;
+    next();
+  }
+
+  app.get('/portal/dashboard', requirePortalSession, async (req, res) => {
+    const { portalSession } = req;
+    const lists = userListsRepository.getListsForUser(portalSession.userId);
+    const enriched = await enrichListsWithChannelInfo(lists);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(dashboardPageHtml(
-      { username: session.username, avatarUrl: session.avatarUrl },
-      lists,
+      { username: portalSession.username, avatarUrl: portalSession.avatarUrl },
+      enriched,
       baseUrl
     ));
+  });
+
+  app.get('/api/portal/guilds', requirePortalSession, async (req, res) => {
+    try {
+      const guilds = await fetchGuilds();
+      res.json(guilds);
+    } catch (err) {
+      console.error('[Web] fetchGuilds:', err);
+      res.status(500).json({ error: 'Error al obtener servidores' });
+    }
+  });
+
+  app.get('/api/portal/guilds/:guildId/channels', requirePortalSession, async (req, res) => {
+    try {
+      const channels = await fetchChannels(req.params.guildId);
+      res.json(channels);
+    } catch (err) {
+      console.error('[Web] fetchChannels:', err);
+      res.status(500).json({ error: 'Error al obtener canales' });
+    }
+  });
+
+  app.post('/api/portal/lists', requirePortalSession, (req, res) => {
+    try {
+      const { guildId, channelId, name, isPersonal } = req.body || {};
+      const userId = req.portalSession.userId;
+      if (!guildId || !channelId || !name || typeof name !== 'string') {
+        return res.status(400).json({ error: 'guildId, channelId y name son requeridos' });
+      }
+      const listName = name.trim().toLowerCase();
+      if (!listName) return res.status(400).json({ error: 'Nombre inválido' });
+      const list = listRepository.getByChannelAndName(guildId, channelId, listName);
+      if (list) return res.status(400).json({ error: `Ya existe una lista "${listName}" en ese canal` });
+      const finalName = isPersonal ? `personal-${userId}` : listName;
+      const created = listRepository.create(guildId, channelId, finalName, userId);
+      if (!created) return res.status(400).json({ error: 'No se pudo crear la lista' });
+      listRepository.addMember(created.id, userId);
+      userListPreferenceRepository.set(guildId, channelId, userId, created.id);
+      const token = listTokenRepository.createOrGetToken(created.id);
+      res.json({ ok: true, list: { ...created, token, displayName: isPersonal ? 'Mi lista' : finalName } });
+    } catch (err) {
+      console.error('[Web] create list:', err);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.get('/portal/logout', (req, res) => {
