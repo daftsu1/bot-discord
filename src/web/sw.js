@@ -1,8 +1,15 @@
-const CACHE = 'despensa-v1';
+const CACHE = 'despensa-v2';
 const LIST_PAGE_KEY = '/v/_template';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+  );
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
@@ -19,10 +26,15 @@ self.addEventListener('fetch', e => {
       .then(res => {
         const clone = res.clone();
         caches.open(CACHE).then(cache => {
-          cache.put(isListPage ? LIST_PAGE_KEY : path, clone);
+          cache.put(isListPage ? url.origin + LIST_PAGE_KEY : e.request, clone);
         });
         return res;
       })
-      .catch(() => caches.match(isListPage ? LIST_PAGE_KEY : path).then(cached => cached || new Response('Sin conexión. Abre la app con internet primero.', { status: 503 })))
+      .catch(() => {
+        const cacheKey = isListPage ? url.origin + LIST_PAGE_KEY : e.request;
+        return caches.match(cacheKey).then(cached =>
+          cached || new Response('Sin conexión. Abre la app con internet primero.', { status: 503 })
+        );
+      })
   );
 });
