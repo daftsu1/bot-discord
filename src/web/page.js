@@ -129,7 +129,78 @@ export function listPageHtml() {
       border: 1px solid var(--text-muted);
     }
     .btn.remove:hover { opacity: 0.9; }
+    .btn.add {
+      background: var(--accent);
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .btn.add:hover { opacity: 0.95; }
     .item-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+    .modal-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4);
+      transform: scale(0.95);
+      transition: transform 0.2s;
+    }
+    .modal-overlay.open .modal {
+      transform: scale(1);
+    }
+    .modal h3 { margin: 0 0 1rem; font-size: 1.125rem; }
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.375rem;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid var(--surface-hover);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+    .modal-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+    .modal-actions .btn { flex: 1; }
     .empty {
       color: var(--text-muted);
       padding: 1.25rem;
@@ -174,6 +245,7 @@ export function listPageHtml() {
   </header>
   <div id="loading">Cargando…</div>
   <div id="content" style="display:none;">
+    <button type="button" class="btn add" id="btnAdd">+ Agregar producto</button>
     <div class="section" id="pendingSection">
       <h2>Por comprar</h2>
       <div id="pendingList"></div>
@@ -184,6 +256,42 @@ export function listPageHtml() {
     </div>
   </div>
   <p id="error" class="error" style="display:none;"></p>
+
+  <div class="modal-overlay" id="addModal">
+    <div class="modal">
+      <h3>Agregar producto</h3>
+      <form id="addForm">
+        <div class="form-group">
+          <label for="addName">Producto *</label>
+          <input type="text" id="addName" name="name" placeholder="ej: Leche, Pan..." required maxlength="100" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="addQuantity">Cantidad</label>
+          <input type="number" id="addQuantity" name="quantity" min="1" max="9999" value="1">
+        </div>
+        <div class="form-group">
+          <label for="addCategory">Categoría (opcional)</label>
+          <input type="text" id="addCategory" name="category" placeholder="ej: lácteos, frutas" maxlength="50" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="addUnit">Unidad (opcional)</label>
+          <select id="addUnit" name="unit">
+            <option value="">—</option>
+            <option value="L">Litros</option>
+            <option value="ml">Mililitros</option>
+            <option value="kg">Kilogramos</option>
+            <option value="g">Gramos</option>
+            <option value="un">Unidades</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn remove" id="btnCancel">Cancelar</button>
+          <button type="submit" class="btn done">Agregar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     const token = window.location.pathname.split('/').pop();
     const api = (path, opts = {}) => fetch('/api/v/' + token + path, opts);
@@ -241,6 +349,15 @@ export function listPageHtml() {
     document.body.addEventListener('click', async (e) => {
       const btn = e.target.closest('button');
       if (!btn) return;
+      if (btn.id === 'btnAdd') {
+        document.getElementById('addModal').classList.add('open');
+        document.getElementById('addName').focus();
+        return;
+      }
+      if (btn.id === 'btnCancel') {
+        document.getElementById('addModal').classList.remove('open');
+        return;
+      }
       const item = btn.closest('.item');
       const name = item && item.dataset.name;
       if (!name) return;
@@ -254,6 +371,39 @@ export function listPageHtml() {
           body: JSON.stringify({ itemName: name })
         });
         if (!r.ok) throw new Error(await r.text());
+        load();
+      } catch (err) {
+        document.getElementById('error').textContent = err.message;
+        document.getElementById('error').style.display = 'block';
+      }
+    });
+
+    document.getElementById('addModal').addEventListener('click', (e) => {
+      if (e.target.id === 'addModal') document.getElementById('addModal').classList.remove('open');
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') document.getElementById('addModal').classList.remove('open');
+    });
+
+    document.getElementById('addForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('addName').value.trim();
+      const quantity = parseInt(document.getElementById('addQuantity').value, 10) || 1;
+      const category = document.getElementById('addCategory').value.trim() || null;
+      const unit = document.getElementById('addUnit').value || null;
+      if (!name) return;
+      try {
+        const r = await api('/items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, quantity, category: category || undefined, unit: unit || undefined })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Error al agregar');
+        document.getElementById('addModal').classList.remove('open');
+        document.getElementById('addForm').reset();
+        document.getElementById('addQuantity').value = 1;
+        document.getElementById('error').style.display = 'none';
         load();
       } catch (err) {
         document.getElementById('error').textContent = err.message;

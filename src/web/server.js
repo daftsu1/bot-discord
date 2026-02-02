@@ -4,6 +4,7 @@ import { channelTokenRepository } from '../database/repositories/channelTokenRep
 import { listTokenRepository } from '../database/repositories/listTokenRepository.js';
 import { listRepository } from '../database/repositories/listRepository.js';
 import { shoppingRepository } from '../database/repositories/shoppingRepository.js';
+import { validateProductName, validateQuantity, validateCategory, validateUnit } from '../validation/index.js';
 import { listPageHtml } from './page.js';
 
 const WEB_USER_ID = 'web';
@@ -54,6 +55,26 @@ export function createWebServer() {
       res.json(items);
     } catch (err) {
       console.error('[Web] GET items:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /** API: agregar ítem a la lista. */
+  app.post('/api/v/:token/items', resolveList, (req, res) => {
+    try {
+      const { listId } = req.listContext;
+      const { name, quantity = 1, category, unit } = req.body || {};
+      const validName = validateProductName(name);
+      const validQuantity = validateQuantity(quantity);
+      const validCategory = validateCategory(category);
+      const validUnit = validateUnit(unit);
+      const item = shoppingRepository.addItem(listId, validName, validQuantity, validCategory, validUnit);
+      res.json({ ok: true, item });
+    } catch (err) {
+      if (err.message?.includes('obligatorio') || err.message?.includes('no puede')) {
+        return res.status(400).json({ error: err.message });
+      }
+      console.error('[Web] POST add item:', err);
       res.status(500).json({ error: err.message });
     }
   });
