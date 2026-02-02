@@ -236,9 +236,35 @@ export function listPageHtml() {
       vertical-align: -0.2em;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .offline-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #fbbf24;
+      color: #1f2937;
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-align: center;
+      z-index: 999;
+      transform: translateY(-100%);
+      transition: transform 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .offline-banner.show {
+      transform: translateY(0);
+    }
+    .offline-banner.syncing {
+      background: var(--accent);
+      color: #0f172a;
+    }
   </style>
 </head>
 <body>
+  <div class="offline-banner" id="offlineBanner" role="status">
+    Sin conexión — Los cambios se guardarán al recuperar el internet
+  </div>
   <header class="header">
     <h1>🛒 Lista de compras</h1>
     <p class="sub">Bot Despensa</p>
@@ -294,19 +320,103 @@ export function listPageHtml() {
 
   <script>
     const token = window.location.pathname.split('/').pop();
+    const CACHE_KEY = 'despensa_cache_' + token;
+    const QUEUE_KEY = 'despensa_queue_' + token;
+    let localItems = null;
+
     const api = (path, opts = {}) => fetch('/api/v/' + token + path, opts);
+
+    function getQueue() {
+      try {
+        return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+      } catch (_) { return []; }
+    }
+    function setQueue(q) {
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    }
+    function addToQueue(action) {
+      const q = getQueue();
+      q.push({ ...action, id: Date.now() + Math.random() });
+      setQueue(q);
+    }
+    function getCachedItems() {
+      try {
+        return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      } catch (_) { return null; }
+    }
+    function setCachedItems(items) {
+      if (items) localStorage.setItem(CACHE_KEY, JSON.stringify(items));
+    }
+
+    function updateOfflineBanner() {
+      const banner = document.getElementById('offlineBanner');
+      if (navigator.onLine) {
+        const q = getQueue();
+        if (q.length > 0) {
+          banner.textContent = 'Sincronizando ' + q.length + ' cambio(s)...';
+          banner.classList.add('show', 'syncing');
+        } else {
+          banner.classList.remove('show', 'syncing');
+        }
+      } else {
+        banner.textContent = 'Sin conexión — Los cambios se guardarán al recuperar el internet';
+        banner.classList.add('show');
+        banner.classList.remove('syncing');
+      }
+    }
+
+    function applyLocalAction(type, payload, items) {
+      const list = (items || localItems || []).map(i => ({ ...i }));
+      if (type === 'mark') {
+        const it = list.find(i => i.name.toLowerCase() === (payload.itemName || '').toLowerCase());
+        if (it) { it.is_purchased = 1; it.purchased_at = new Date().toISOString(); }
+      } else if (type === 'unmark') {
+        const it = list.find(i => i.name.toLowerCase() === (payload.itemName || '').toLowerCase());
+        if (it) { it.is_purchased = 0; it.purchased_at = null; it.purchased_by = null; }
+      } else if (type === 'remove') {
+        const idx = list.findIndex(i => i.name.toLowerCase() === (payload.itemName || '').toLowerCase());
+        if (idx >= 0) list.splice(idx, 1);
+      } else if (type === 'add' && payload.name) {
+        const n = (payload.name || '').trim().toLowerCase();
+        const existing = list.find(i => i.name.toLowerCase() === n);
+        if (existing) {
+          existing.quantity = (existing.quantity || 1) + (payload.quantity || 1);
+        } else {
+          list.push({
+            id: 'local-' + Date.now(),
+            name: (payload.name || '').trim(),
+            quantity: payload.quantity || 1,
+            category: payload.category || null,
+            unit: payload.unit || null,
+            is_purchased: 0
+          });
+        }
+      }
+      return list;
+    }
 
     async function load() {
       try {
         const r = await api('/items');
         if (!r.ok) throw new Error('No se pudo cargar la lista');
         const items = await r.json();
+        localItems = items;
+        setCachedItems(items);
         render(items);
+        document.getElementById('error').style.display = 'none';
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('error').textContent = e.message;
-        document.getElementById('error').style.display = 'block';
+        if (!navigator.onLine && getCachedItems()) {
+          localItems = getCachedItems();
+          render(localItems);
+          document.getElementById('content').style.display = 'block';
+          document.getElementById('error').style.display = 'none';
+        } else {
+          document.getElementById('error').textContent = navigator.onLine ? e.message : 'Sin conexión. Los cambios se guardarán al reconectar.';
+          document.getElementById('error').style.display = 'block';
+        }
       }
+      updateOfflineBanner();
     }
 
     function render(items) {
@@ -346,6 +456,33 @@ export function listPageHtml() {
       return div.innerHTML;
     }
 
+    async function doAction(path, body, localType, localPayload) {
+      if (navigator.onLine) {
+        try {
+          const r = await api(path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          if (!r.ok) {
+            const txt = await r.text();
+            try { throw new Error(JSON.parse(txt).error || txt); } catch (_) { throw new Error(txt); }
+          }
+          load();
+        } catch (err) {
+          document.getElementById('error').textContent = err.message;
+          document.getElementById('error').style.display = 'block';
+          updateOfflineBanner();
+        }
+      } else {
+        localItems = applyLocalAction(localType, localPayload);
+        setCachedItems(localItems);
+        render(localItems);
+        addToQueue({ type: localType, path, body });
+        updateOfflineBanner();
+      }
+    }
+
     document.body.addEventListener('click', async (e) => {
       const btn = e.target.closest('button');
       if (!btn) return;
@@ -361,21 +498,11 @@ export function listPageHtml() {
       const item = btn.closest('.item');
       const name = item && item.dataset.name;
       if (!name) return;
-      let path = '/items/mark';
-      if (btn.classList.contains('undo')) path = '/items/unmark';
-      if (btn.classList.contains('remove')) path = '/items/remove';
-      try {
-        const r = await api(path, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ itemName: name })
-        });
-        if (!r.ok) throw new Error(await r.text());
-        load();
-      } catch (err) {
-        document.getElementById('error').textContent = err.message;
-        document.getElementById('error').style.display = 'block';
-      }
+      let path = '/items/mark', type = 'mark';
+      if (btn.classList.contains('undo')) { path = '/items/unmark'; type = 'unmark'; }
+      if (btn.classList.contains('remove')) { path = '/items/remove'; type = 'remove'; }
+      const body = { itemName: name };
+      await doAction(path, body, type, { itemName: name });
     });
 
     document.getElementById('addModal').addEventListener('click', (e) => {
@@ -392,24 +519,62 @@ export function listPageHtml() {
       const category = document.getElementById('addCategory').value.trim() || null;
       const unit = document.getElementById('addUnit').value || null;
       if (!name) return;
-      try {
-        const r = await api('/items', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, quantity, category: category || undefined, unit: unit || undefined })
-        });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || 'Error al agregar');
+      const body = { name, quantity, category: category || undefined, unit: unit || undefined };
+      const payload = { name, quantity, category, unit };
+
+      if (navigator.onLine) {
+        try {
+          const r = await api('/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'Error al agregar');
+          document.getElementById('addModal').classList.remove('open');
+          document.getElementById('addForm').reset();
+          document.getElementById('addQuantity').value = 1;
+          document.getElementById('error').style.display = 'none';
+          load();
+        } catch (err) {
+          document.getElementById('error').textContent = err.message;
+          document.getElementById('error').style.display = 'block';
+        }
+      } else {
+        localItems = applyLocalAction('add', payload);
+        setCachedItems(localItems);
+        render(localItems);
+        addToQueue({ type: 'add', path: '/items', body });
         document.getElementById('addModal').classList.remove('open');
         document.getElementById('addForm').reset();
         document.getElementById('addQuantity').value = 1;
         document.getElementById('error').style.display = 'none';
-        load();
-      } catch (err) {
-        document.getElementById('error').textContent = err.message;
-        document.getElementById('error').style.display = 'block';
+        updateOfflineBanner();
       }
     });
+
+    async function syncQueue() {
+      const q = getQueue();
+      if (q.length === 0) { updateOfflineBanner(); return; }
+      updateOfflineBanner();
+      const remaining = [];
+      for (const a of q) {
+        try {
+          const r = await api(a.path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(a.body)
+          });
+          if (!r.ok) remaining.push(a);
+        } catch (_) { remaining.push(a); }
+      }
+      setQueue(remaining);
+      await load();
+      updateOfflineBanner();
+    }
+
+    window.addEventListener('online', syncQueue);
+    window.addEventListener('offline', updateOfflineBanner);
 
     load();
   </script>
