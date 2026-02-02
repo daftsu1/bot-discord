@@ -52,24 +52,26 @@ export function loginPageHtml(baseUrl) {
     h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
     p { color: var(--text-muted); font-size: 0.9375rem; margin: 0 0 1.5rem; line-height: 1.5; }
     .btn-discord {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.75rem;
-      padding: 0.875rem 1.5rem;
+      gap: 0.625rem;
+      width: 100%;
+      padding: 0.875rem 1.25rem;
       background: var(--accent);
       color: white;
       text-decoration: none;
       border-radius: 8px;
       font-weight: 600;
-      font-size: 1rem;
+      font-size: 0.9375rem;
       font-family: inherit;
       border: none;
       cursor: pointer;
       transition: background 0.2s;
+      white-space: nowrap;
     }
     .btn-discord:hover { background: var(--accent-hover); }
-    .btn-discord svg { width: 24; height: 24; flex-shrink: 0; }
+    .btn-discord svg { width: 22px; height: 22px; flex-shrink: 0; }
   </style>
 </head>
 <body>
