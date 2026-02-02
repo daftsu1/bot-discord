@@ -1,8 +1,8 @@
 services:
   bot:
     build: .
-    image: bot-discord-alacena:latest
-    container_name: bot-alacena
+    image: bot-despensa:latest
+    container_name: bot-despensa
     restart: unless-stopped
     env_file: .env
     volumes:

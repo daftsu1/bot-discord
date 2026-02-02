@@ -99,7 +99,7 @@ Así la instancia puede clonar el repo por SSH y, más adelante, un pipeline (p.
 1. Generar una clave SSH (sin passphrase para uso en servidor):
 
 ```bash
-ssh-keygen -t ed25519 -C "ec2-bot-alacena" -f ~/.ssh/id_ed25519_bot -N ""
+ssh-keygen -t ed25519 -C "ec2-bot-despensa" -f ~/.ssh/id_ed25519_bot -N ""
 ```
 
 2. Ver la clave pública para copiarla:
@@ -168,8 +168,8 @@ El volumen `./data` persiste la base SQLite en el host, así que los datos se ma
 ### Build solo con Docker (sin compose)
 
 ```bash
-docker build -t bot-alacena .
-docker run -d --restart unless-stopped --env-file .env -v $(pwd)/data:/app/data --name bot-alacena bot-alacena
+docker build -t bot-despensa .
+docker run -d --restart unless-stopped --env-file .env -v $(pwd)/data:/app/data --name bot-despensa bot-despensa
 ```
 
 ## Estructura
