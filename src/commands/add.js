@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { shoppingService } from '../services/shoppingService.js';
+import { LIMITS } from '../validation/constants.js';
 
 export const command = {
   data: new SlashCommandBuilder()
@@ -9,15 +10,18 @@ export const command = {
       opt.setName('producto')
         .setDescription('Nombre del producto')
         .setRequired(true)
+        .setMaxLength(LIMITS.PRODUCT_NAME_MAX_LENGTH)
     )
     .addIntegerOption(opt =>
       opt.setName('cantidad')
         .setDescription('Cantidad (default: 1)')
         .setMinValue(1)
+        .setMaxValue(LIMITS.QUANTITY_MAX)
     )
     .addStringOption(opt =>
       opt.setName('categoria')
         .setDescription('Categoría (ej: lácteos, frutas)')
+        .setMaxLength(LIMITS.CATEGORY_MAX_LENGTH)
     ),
 
   async execute(interaction) {

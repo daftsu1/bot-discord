@@ -1,4 +1,5 @@
 import { shoppingRepository } from '../database/repositories/shoppingRepository.js';
+import { validateProductName, validateQuantity, validateCategory } from '../validation/index.js';
 
 /**
  * Servicio de lista de compras.
@@ -7,19 +8,20 @@ import { shoppingRepository } from '../database/repositories/shoppingRepository.
 
 export const shoppingService = {
   addItem(guildId, channelId, name, quantity = 1, category = null) {
-    if (!name?.trim()) throw new Error('El nombre del producto es obligatorio');
-    if (quantity < 1) throw new Error('La cantidad debe ser al menos 1');
+    const validName = validateProductName(name);
+    const validQuantity = validateQuantity(quantity);
+    const validCategory = validateCategory(category);
 
-    const result = shoppingRepository.addItem(guildId, channelId, name, quantity, category);
+    const result = shoppingRepository.addItem(guildId, channelId, validName, validQuantity, validCategory);
     return { success: true, item: result };
   },
 
   removeItem(guildId, channelId, name) {
-    if (!name?.trim()) throw new Error('El nombre del producto es obligatorio');
+    const validName = validateProductName(name);
 
-    const result = shoppingRepository.removeItem(guildId, channelId, name);
+    const result = shoppingRepository.removeItem(guildId, channelId, validName);
     if (result.rowCount === 0) {
-      throw new Error(`No se encontró "${name}" en la lista`);
+      throw new Error(`No se encontró "${validName}" en la lista`);
     }
     return { success: true };
   },
@@ -29,18 +31,18 @@ export const shoppingService = {
   },
 
   markAsPurchased(guildId, channelId, itemName, userId) {
-    if (!itemName?.trim()) throw new Error('El nombre del producto es obligatorio');
+    const validName = validateProductName(itemName);
 
-    const result = shoppingRepository.markAsPurchased(guildId, channelId, itemName, userId);
-    if (!result) throw new Error(`No se encontró "${itemName}" en la lista`);
+    const result = shoppingRepository.markAsPurchased(guildId, channelId, validName, userId);
+    if (!result) throw new Error(`No se encontró "${validName}" en la lista`);
     return { success: true, item: result };
   },
 
   unmarkAsPurchased(guildId, channelId, itemName) {
-    if (!itemName?.trim()) throw new Error('El nombre del producto es obligatorio');
+    const validName = validateProductName(itemName);
 
-    const result = shoppingRepository.unmarkAsPurchased(guildId, channelId, itemName);
-    if (!result) throw new Error(`No se encontró "${itemName}" en la lista`);
+    const result = shoppingRepository.unmarkAsPurchased(guildId, channelId, validName);
+    if (!result) throw new Error(`No se encontró "${validName}" en la lista`);
     return { success: true, item: result };
   },
 

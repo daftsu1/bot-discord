@@ -4,6 +4,7 @@ Bot de Discord para gestionar la lista de compras del supermercado, con soporte 
 
 ## Módulo 1: Lista de compras
 
+- **/help** – Muestra los comandos disponibles del bot
 - **/agregar** – Añade productos (con cantidad y categoría opcionales)
 - **/quitar** – Elimina un producto de la lista
 - **/lista** – Muestra la lista (incluye o excluye comprados)
@@ -41,6 +42,30 @@ O en modo desarrollo con recarga automática:
 ```bash
 npm run dev
 ```
+
+## Tests y validaciones
+
+El proyecto incluye **tests** con [Vitest](https://vitest.dev) y **validaciones** en la capa de servicio.
+
+**Ejecutar tests:**
+
+```bash
+npm test
+```
+
+En modo watch (re-ejecuta al cambiar archivos):
+
+```bash
+npm run test:watch
+```
+
+**Validaciones aplicadas:**
+
+- **Nombre de producto:** obligatorio, sin espacios vacíos, máximo 100 caracteres.
+- **Cantidad:** entero ≥ 1 y ≤ 9999.
+- **Categoría:** opcional, máximo 50 caracteres.
+
+Los comandos slash (`/agregar`, `/quitar`, `/marcar`) usan `setMaxLength` y `setMaxValue` para que Discord también aplique estos límites en la UI.
 
 ## Configuración de moneda
 
